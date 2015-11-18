@@ -1,7 +1,7 @@
 # makefile for web scraper
 
 all: 
-	r -f *.R
+	R -f *.R
 
 output:
 	mkdir output
