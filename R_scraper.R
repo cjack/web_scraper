@@ -12,7 +12,6 @@
 #-------------- Pre-definitions ----------------
 library(rvest)
 require(RCurl)
-require(XML)
 
 csvname = "sydney_council.csv"
 hostname <- "https://whatson.cityofsydney.nsw.gov.au"
@@ -20,6 +19,10 @@ output_filename = "output.txt"
 
 ##-----------------------------
 
+if(!file.exists(output_filename)){
+  file.create(output_filename)
+  print("creating new output file")
+}
 
 main_page_generator <- function(length = 30){
   start_date <- Sys.Date()
@@ -27,7 +30,8 @@ main_page_generator <- function(length = 30){
   url = paste("https://whatson.cityofsydney.nsw.gov.au/search/advanced?date%5B%5D=", start_date, "&date%5B%5D=", end_date, sep = "")
   return(url)
 }
-page  <- main_page_generator()
+oneyear = 356
+page  <- main_page_generator(oneyear)
 
 content <- readLines(page)
 
@@ -114,19 +118,20 @@ for(i in 1:length(res)){
   check_existence <- function(line, lines){
     for(i in 1:length(lines)){
       if(identical(line, lines[i])){
-        return(FALSE)
+        return(TRUE)
       }
     }
-    return(TRUE)
+    return(FALSE)
   }
   res[[i]] <- paste(hostname, res[[i]], sep = "")
   pre_urls <- readLines(output_filename)
-  if(check_existence(res[[i]], pre_urls)){
+  if(!check_existence(res[[i]], pre_urls)){
     print(paste("Found new pages", res[[i]]))
     write(res[[i]],file=output_filename,append=TRUE)
     scraper_webpage(res[[i]])
   }
 }
+
 
 
 
