@@ -10,6 +10,7 @@ require(RCurl)
 csvname = "sydney.csv"
 hostname <- "http://www.sydney.com"
 output_filename = "output.txt"
+num_of_info_per_page <- 20
 
 ##-----------------------------
 
@@ -47,6 +48,7 @@ search_result <- function(url, token){
 
 scraper_webpage <- function(url){
   library(rvest)
+  
   test <- read_html(url)
   
 
@@ -89,7 +91,7 @@ scraper_webpage <- function(url){
 
 # generate the searching pages, return a list
 
-main_page_generator <- function(date = "12-12-2016", numPerPage = 20, MAX = 100){
+main_page_generator <- function(date = "12-12-2016", numPerPage = num_of_info_per_page, MAX = 100){
   num <- 1
   url_list <- list()
   checked <- FALSE
@@ -103,12 +105,14 @@ main_page_generator <- function(date = "12-12-2016", numPerPage = 20, MAX = 100)
       MAX <- search_result(read_html(url), match_token)
       MAX <- as.numeric(substr(MAX, 1, nchar(MAX) - nchar(" matches")))
       checked = TRUE
+      print(paste(toString(MAX), "matches in search"))
     }
   }
   return(url_list)
 }
 
 main_process <- function(page_list){
+  count <- 0 
   for(i in 1 : length(page_list)){
     page <- page_list[[i]]
     content <- readLines(page, warn = F)
@@ -125,13 +129,15 @@ main_process <- function(page_list){
       res[[i]] <- paste(hostname, res[[i]], sep = "")
       pre_urls <- readLines(output_filename)
       if(!check_existence(res[[i]], pre_urls)){
+        count <- count + 1
         print(paste("Found new pages", res[[i]]))
         write(res[[i]],file=output_filename,append=TRUE)
-        scraper_webpage(res[[i]])
+        try(scraper_webpage(res[[i]]), TRUE)
       }
   }
   
   }
+  print(paste("Total new pages added:", toString(count)))
 }
 page_list  <- main_page_generator()
 main_process(page_list)
