@@ -35,21 +35,21 @@ pattern_match<- function(url, pattern, pre_sz = 0, suf_sz = 0){
   }
   return(res)
 }
+##-----------------------------
+
+search_result <- function(url, token){
+  res <- url %>%
+    html_nodes(token) %>%
+    html_text()
+  return(res)
+}
 
 
 scraper_webpage <- function(url){
   library(rvest)
   test <- read_html(url)
   
-  ##-----------------------------
-  
-  search_result <- function(url, token){
-    res <- url %>%
-      html_nodes(token) %>%
-      html_text()
-    return(res)
-  }
-  
+
   #-----------      Token Matching    ------------------
   title_token = "title "
   title = search_result(test, title_token)
@@ -57,7 +57,7 @@ scraper_webpage <- function(url){
   location_token = "div.adr"
   location = search_result(test, location_token)
   location = gsub('\n', "", location)
-  location = gsub("                ", " ", location)
+  location = gsub('\t', "", location)
   
   phone_token = "span.tel"
   phone <- search_result(test, phone_token)
@@ -89,14 +89,21 @@ scraper_webpage <- function(url){
 
 # generate the searching pages, return a list
 
-main_page_generator <- function(date = "12-12-2016", numPerPage = 20, MAX = 300){
+main_page_generator <- function(date = "12-12-2016", numPerPage = 20, MAX = 100){
   num <- 1
   url_list <- list()
-  
+  checked <- FALSE
   while(num < MAX){
     url = paste("http://www.sydney.com/events/search?&start_rank=", num,"&query=&meta_D_orsand=&date_from=&date_to=", date, "&meta_k_phrase_orsand=", sep = "")
     url_list <- c(url_list, url)
     num <- num + numPerPage
+    if(checked == FALSE){
+      #update the MAX
+      match_token = "p.matches"
+      MAX <- search_result(read_html(url), match_token)
+      MAX <- as.numeric(substr(MAX, 1, nchar(MAX) - nchar(" matches")))
+      checked = TRUE
+    }
   }
   return(url_list)
 }
