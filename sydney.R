@@ -59,7 +59,7 @@ scraper_webpage <- function(url){
   location_token = "div.adr"
   location = search_result(test, location_token)
   location = gsub('\n', "", location)
-  location = gsub('\t', "", location)
+  location = gsub("                ", " ", location)
   
   phone_token = "span.tel"
   phone <- search_result(test, phone_token)
@@ -141,3 +141,4 @@ main_process <- function(page_list){
 }
 page_list  <- main_page_generator()
 main_process(page_list)
+print("All done!")
