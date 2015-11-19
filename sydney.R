@@ -66,9 +66,10 @@ scraper_webpage <- function(url){
   
   about_token = "div.about-block p"
   about <- search_result(test, about_token)
-  summary <- about[2]
+  summary <- about[length(about)]
   
-  dates <- about[1]
+  # in case multiple dates
+  dates <- about[1:length(about) - 1]
   dates
   
   cast <- html_nodes(test, "div.side-box a")
