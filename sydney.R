@@ -64,13 +64,16 @@ scraper_webpage <- function(url){
   phone_token = "span.tel"
   phone <- search_result(test, phone_token)
   
+  dates_token = "div.event-date-details"
+  dates <- search_result(test, dates_token)
+  
+  
   about_token = "div.about-block p"
   about <- search_result(test, about_token)
+
   summary <- about[length(about)]
-  
-  # in case multiple dates
-  dates <- about[1:length(about) - 1]
-  dates
+
+
   
   cast <- html_nodes(test, "div.side-box a")
   link <- html_attr(cast, "title")
