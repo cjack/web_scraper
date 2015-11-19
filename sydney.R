@@ -19,6 +19,7 @@ if(!file.exists(output_filename)){
   print("creating new output file")
 }
 
+
 pa_prefix <- "href=\"/events/"
 pa_sufix <- "\">"
 pattern <- paste(pa_prefix, ".*?", pa_sufix, sep = "")
@@ -51,7 +52,7 @@ scraper_webpage <- function(url){
   
   test <- read_html(url)
   
-
+  
   #-----------      Token Matching    ------------------
   title_token = "title "
   title = search_result(test, title_token)
@@ -70,10 +71,10 @@ scraper_webpage <- function(url){
   
   about_token = "div.about-block p"
   about <- search_result(test, about_token)
-
+  
   summary <- about[length(about)]
-
-
+  
+  
   
   cast <- html_nodes(test, "div.side-box a")
   link <- html_attr(cast, "title")
@@ -81,15 +82,27 @@ scraper_webpage <- function(url){
   match_token = "p.matches"
   MAX <- search_result(test, match_token)
   MAX <- as.numeric(substr(MAX, 1, nchar(MAX) - nchar(" matches")))
-
+  
   
   #---------------------------------------------------
+  # Add three empty cols for "Kids Related", "Comment", "Tags"
   
-  res <- c(title, dates, location, summary, phone, link)
+  empty <- ""
+  res <- c(empty, empty, empty, title, dates, location, summary, phone, link)
+  
+  #check if exist csv file, if not, add the col names
+  if(!file.exists(csvname)){
+    file.create(output_filename)
+    col_name = matrix(res, nrow = 1, ncol = length(res))
+    colnames(col_name) <- c("Kids Related", "Comment", "Tags", "Title", "Time", "Location", "Content", "Cost", "MoreInfo","Tags")
+    write.table(col_name, file = csvname,sep = ",", append = T, row.names = F, col.names = T)
+    print("creating new csv file")
+  }
+  
   Table = matrix(res, nrow = 1, ncol = length(res))
-  length(res)
-  Table
-  #colnames(Table) <- c("Title", "Time", "Location", "Content", "Cost", "MoreInfo","Tags")
+  
+  
+  
   write.table(Table, file = csvname,sep = ",", append = T, row.names = F, col.names = F)
 }
 
@@ -98,6 +111,8 @@ scraper_webpage <- function(url){
 main_page_generator <- function(date = "12-12-2016", numPerPage = num_of_info_per_page, MAX = 100){
   num <- 1
   url_list <- list()
+  #only for debug
+  #checked <- TRUE
   checked <- FALSE
   while(num < MAX){
     url = paste("http://www.sydney.com/events/search?&start_rank=", num,"&query=&meta_D_orsand=&date_from=&date_to=", date, "&meta_k_phrase_orsand=", sep = "")
@@ -138,8 +153,8 @@ main_process <- function(page_list){
         write(res[[i]],file=output_filename,append=TRUE)
         try(scraper_webpage(res[[i]]), TRUE)
       }
-  }
-  
+    }
+    
   }
   print(paste("Total new pages added:", toString(count)))
 }
