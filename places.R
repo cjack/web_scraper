@@ -58,7 +58,6 @@ search_result <- function(url, token){
 
 scraper_webpage <- function(url, category){
   library(rvest)
-  
   test <- read_html(url)
   
   
@@ -101,7 +100,7 @@ scraper_webpage <- function(url, category){
   }
   
   Table = matrix(res, nrow = 1, ncol = length(res))
-  if(!is.na(summary) && !is.na(location))
+  if(length(summary) != 1 && length(location) != 1)
     write.table(Table, file = csvname,sep = ",", append = T, row.names = F, col.names = F)
 }
 
