@@ -1,5 +1,6 @@
 # Author: Yi Lin
-# 2015.11.18
+# 2015.11.19
+# This program is to catch the places descriptions in Sydney
 
 
 #-------------- Pre-definitions ----------------
@@ -25,8 +26,8 @@ if(!file.exists(output_filename)){
   print("creating new output file")
 }
 
-pa_token <- "/destinations/"
-pa_prefix <- "href=\"/destinations/"
+pa_token <- "/destinations/sydney/"
+pa_prefix <- "href=\"/destinations/sydney/"
 pa_sufix <- "\">"
 pattern <- paste(pa_prefix, ".*?", pa_sufix, sep = "")
 
@@ -49,11 +50,13 @@ search_result <- function(url, token){
   res <- url %>%
     html_nodes(token) %>%
     html_text()
+  if((length(res) == 0) && (typeof(res) == "character"))
+    return("")
   return(res)
 }
 
 
-scraper_webpage <- function(url){
+scraper_webpage <- function(url, category){
   library(rvest)
   
   test <- read_html(url)
@@ -71,33 +74,35 @@ scraper_webpage <- function(url){
   phone_token = "span.tel"
   phone <- search_result(test, phone_token)
   
-  
-  
   about_token = "div.about-block p"
   about <- search_result(test, about_token)
   
   summary <- about[length(about)]
   
-  
-  
   cast <- html_nodes(test, "div.side-box a")
   link <- html_attr(cast, "title")
-
+  
   
   
   #---------------------------------------------------
   # Add three empty cols for "Kids Related", "Comment", "Tags"
   
+  res <- c(category, title, location, summary, phone, link)
   
-  res <- c(title, location, summary, phone, link)
   
-
+  
+  #check if exist csv file, if not, add the col names
+  if(!file.exists(csvname)){
+    file.create(output_filename)
+    col_name = matrix(res, nrow = 1, ncol = length(res))
+    colnames(col_name) <- c("Category","Title", "Location", "Content", "Contact", "Websites")
+    write.table(col_name, file = csvname,sep = ",", append = T, row.names = F, col.names = T)
+    print("creating new csv file")
+  }
   
   Table = matrix(res, nrow = 1, ncol = length(res))
-  
-  
-  
-  write.table(Table, file = csvname,sep = ",", append = T, row.names = F, col.names = F)
+  if(!is.na(summary) && !is.na(location))
+    write.table(Table, file = csvname,sep = ",", append = T, row.names = F, col.names = F)
 }
 
 # generate the searching pages, return a list
@@ -118,6 +123,7 @@ main_page_generator <- function(category_names = category_names, numPerPage = nu
                   category,"?&start_rank=", num, "&", sep = "")
       
       url_list <- c(url_list, url)
+      url_list <- c(url_list, category)
       num <- num + numPerPage
       if(checked == FALSE){
         #update the MAX
@@ -135,10 +141,12 @@ main_page_generator <- function(category_names = category_names, numPerPage = nu
 
 main_process <- function(page_list){
   count <- 0 
-  for(i in 1 : length(page_list)){
+  for(i in seq(1, length(page_list), 2)){
     page <- page_list[[i]]
+    category <- category_tags[which(category_names == page_list[[i + 1]])]
     content <- readLines(page, warn = F)
     res <- unique(pattern_match(content, pattern, (nchar(pa_prefix) - nchar(pa_token)), nchar(pa_sufix)))
+    
     for(i in 1:length(res)){
       check_existence <- function(line, lines){
         for(i in 1:length(lines)){
@@ -154,7 +162,7 @@ main_process <- function(page_list){
         count <- count + 1
         print(paste("Found new pages", res[[i]]))
         write(res[[i]],file=output_filename,append=TRUE)
-        try(scraper_webpage(res[[i]]), TRUE)
+        try(scraper_webpage(res[[i]], category), TRUE)
       }
     }
     
