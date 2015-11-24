@@ -7,7 +7,7 @@ other webpages.
 * Instructions
 Bascially, run the command,
 #+BEGIN_SRC sh
-r -f *.R
+R -f *.R
 #+END_SRC
 Or run 
 #+BEGIN_SRC sh
@@ -16,4 +16,4 @@ make
 * Packages
 - Require "rvest", please run command by "install.package("rvest")"
 - Require "RCurl", please use similar command as above.
-- Require "XML", please use similar command as above.
+
