@@ -45,8 +45,8 @@ pattern_match<- function(url, pattern, pre_sz = 0, suf_sz = 0){
   return(res)
 }
 ##-----------------------------
-remove_comma <- function(str){
-  return(gsub(',', ' ', str))
+remove_quote <- function(str){
+  return(gsub("\"", "'", str))
 }
 
 search_result <- function(url, token){
@@ -55,7 +55,7 @@ search_result <- function(url, token){
     html_text()
   if((length(res) == 0) && (typeof(res) == "character"))
     res <- ""
-  res <- remove_comma(res)
+  #res <- remove_comma(toString(res))
   return(toString(res))
 }
 
@@ -64,7 +64,7 @@ search_attr <- function(url, token, attr){
   res <- html_attr(cast, attr)
   if((length(res) == 0) && (typeof(res) == "character"))
     res <- ""
-  res <- remove_comma(res)
+  #res <- remove_comma(toString(res))
   return(toString(res))
 }
 
@@ -90,6 +90,8 @@ scraper_webpage <- function(url, category){
   
   summary <- about[length(about)]
   
+  summary <- remove_quote(summary)
+  
   link <- search_attr(test, "div.side-box a", "title")
   
   
@@ -110,7 +112,7 @@ scraper_webpage <- function(url, category){
     print("creating new csv file")
   }else{
     Table = matrix(res, nrow = 1, ncol = length(res))
-    if(summary != "" && location != "")
+    if(summary != "" || location != "")
       write.table(Table, file = csvname,sep = ",", append = T, row.names = F, col.names = F)
   }
   
