@@ -45,6 +45,9 @@ pattern_match<- function(url, pattern, pre_sz = 0, suf_sz = 0){
   return(res)
 }
 ##-----------------------------
+remove_comma <- function(str){
+  return(gsub(',', ' ', str))
+}
 
 search_result <- function(url, token){
   res <- url %>%
@@ -52,6 +55,7 @@ search_result <- function(url, token){
     html_text()
   if((length(res) == 0) && (typeof(res) == "character"))
     res <- ""
+  res <- remove_comma(res)
   return(toString(res))
 }
 
@@ -60,6 +64,7 @@ search_attr <- function(url, token, attr){
   res <- html_attr(cast, attr)
   if((length(res) == 0) && (typeof(res) == "character"))
     res <- ""
+  res <- remove_comma(res)
   return(toString(res))
 }
 
