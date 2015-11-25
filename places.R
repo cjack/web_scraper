@@ -45,7 +45,7 @@ pattern_match<- function(url, pattern, pre_sz = 0, suf_sz = 0){
   return(res)
 }
 ##-----------------------------
-remove_quote <- function(str){
+remove_comma <- function(str){
   return(gsub("\"", "'", str))
 }
 
@@ -90,7 +90,7 @@ scraper_webpage <- function(url, category){
   
   summary <- about[length(about)]
   
-  summary <- remove_quote(summary)
+  summary <- remove_comma(summary)
   
   link <- search_attr(test, "div.side-box a", "title")
   
