@@ -51,10 +51,17 @@ search_result <- function(url, token){
     html_nodes(token) %>%
     html_text()
   if((length(res) == 0) && (typeof(res) == "character"))
-    return("")
-  return(res)
+    res <- ""
+  return(toString(res))
 }
 
+search_attr <- function(url, token, attr){
+  cast <- html_nodes(url, token)
+  res <- html_attr(cast, attr)
+  if((length(res) == 0) && (typeof(res) == "character"))
+    res <- ""
+  return(toString(res))
+}
 
 scraper_webpage <- function(url, category){
   library(rvest)
@@ -78,8 +85,7 @@ scraper_webpage <- function(url, category){
   
   summary <- about[length(about)]
   
-  cast <- html_nodes(test, "div.side-box a")
-  link <- html_attr(cast, "title")
+  link <- search_attr(test, "div.side-box a", "title")
   
   
   
@@ -89,7 +95,7 @@ scraper_webpage <- function(url, category){
   res <- c(category, title, location, summary, phone, link)
   
   
-  
+  #res <- c("a","a","a","a","a","a")
   #check if exist csv file, if not, add the col names
   if(!file.exists(csvname)){
     file.create(output_filename)
@@ -97,11 +103,13 @@ scraper_webpage <- function(url, category){
     colnames(col_name) <- c("Category","Title", "Location", "Content", "Contact", "Websites")
     write.table(col_name, file = csvname,sep = ",", append = T, row.names = F, col.names = T)
     print("creating new csv file")
+  }else{
+    Table = matrix(res, nrow = 1, ncol = length(res))
+    if(summary != "" && location != "")
+      write.table(Table, file = csvname,sep = ",", append = T, row.names = F, col.names = F)
   }
   
-  Table = matrix(res, nrow = 1, ncol = length(res))
-  if(length(summary) != 1 && length(location) != 1)
-    write.table(Table, file = csvname,sep = ",", append = T, row.names = F, col.names = F)
+  
 }
 
 # generate the searching pages, return a list
