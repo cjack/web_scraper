@@ -32,7 +32,7 @@ generate_links <- function(url){
   library(RSelenium)
   checkForServer(dir = NULL, update = FALSE)
   RSelenium::startServer(dir = NULL, args = NULL, invisible = TRUE, log = TRUE)
-  remDr <- remoteDriver(port = 4456)
+  remDr <- remoteDriver()
   remDr$open()
   
   
