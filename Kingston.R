@@ -32,7 +32,7 @@ generate_links <- function(url){
   library(RSelenium)
   checkForServer(dir = NULL, update = FALSE)
   RSelenium::startServer(dir = NULL, args = NULL, invisible = TRUE, log = TRUE)
-  remDr <- remoteDriver()
+  remDr <- remoteDriver(port = 4456)
   remDr$open()
   
   
@@ -47,7 +47,7 @@ generate_links <- function(url){
   
   
   #pagination
-  MAX <- 11
+  MAX <- 2^16 - 1
   res_links <- list()
   for(page_num in 1:MAX){
     Sys.sleep(1)
@@ -55,7 +55,17 @@ generate_links <- function(url){
       page <- paste("#page-", toString(page_num), sep = "")
       Xpath_pattern <- paste("//*/a[@href = '", page, "']", sep = "")
       Xpath_pattern
-      webElem <- remDr$findElement(using = "xpath", Xpath_pattern)
+      possibleError <- tryCatch(
+        remDr$findElement(using = "xpath", Xpath_pattern),
+        error=function(e) e
+      )
+      
+      if(!inherits(possibleError, "error")){
+        #REAL WORK
+        webElem <- possibleError
+      }else{
+        break
+      }
       # webElem <- remDr$findElement(using = "xpath", "//*/a[@href = '#page-1']")
       webElem$sendKeysToElement(list("\uE007"))
     }
