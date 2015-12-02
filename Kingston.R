@@ -4,6 +4,7 @@
 
 #-------------- Pre-definitions ----------------
 library(rvest)
+library(xml2)
 library("RSelenium")
 
 csvname = "kingston.csv"
@@ -154,7 +155,6 @@ process_each_page <- function(link){
   
   
   
-  
   #check if exist csv file, if not, add the col names
   if(!file.exists(csvname)){
     file.create(csvname)
@@ -180,13 +180,15 @@ main_process <- function(url){
       write(current_link,file=output_filename,append=TRUE)
       try(scraper_webpage(current_link), TRUE)
     }
-    process_each_page(current_link)
+    #process_each_page(current_link)
   }
 }
 
 url = "http://www.mycommunitylife.com.au/Events-Activities"
 
 main_process(url)
+
+print("All done")
 
 
 
