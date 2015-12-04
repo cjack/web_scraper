@@ -4,6 +4,8 @@
 # by far only the title and rates, also has a column to mark whether has been 
 # watched or not
 # more details can be added: Directors, Stars, Summary, Tags
+# for the csv file it will generate a new one each time 
+
 
 #--------------------      pre-definition    -----------------------------------
 library(rvest)
@@ -63,20 +65,24 @@ process_each_page <- function(link){
   test <- read_html(link)
   title_token = "title"
   title = search_result(test, title_token)
-  
+  suffixStr <- " (0000) - IMDB"
+  titleLength <- nchar(title) - nchar(suffixStr)
+  theYear <- substr(title, titleLength + nchar(" (") + 1, titleLength + nchar(" (0000"))
+  title <- substr(title, 1, titleLength)
+
   rates_token <- "div.star-box-details strong span"
   rates <- search_result(test, rates_token)
   
   watched <- "F"
   this_url <- paste(host, link, sep = "")
-  res <- c(title, rates, watched, this_url)
+  res <- c(title, theYear, rates, watched, this_url)
   
   # write to file
   # check if exist csv file, if not, add the col names
   if(!file.exists(csvname)){
     file.create(csvname)
     col_name = matrix(res, nrow = 1, ncol = length(res))
-    colnames(col_name) <- c( "Title", "Rates", "Watched", "Link")
+    colnames(col_name) <- c( "Title", "Year","Rates", "Watched", "Link")
     write.table(col_name, file = csvname,sep = ",", append = T, row.names = F, col.names = T)
     print("creating new csv file")
   }else{
