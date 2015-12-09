@@ -1,0 +1,77 @@
+package util;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.regex.Pattern;
+
+public class PatternProcessor {
+
+	protected HashMap<Integer, ArrayList<Pattern>> patternMap;
+	protected HashMap<Integer, HashMap<String, String>> replacementsMap;
+	
+	public PatternProcessor () {
+		patternMap = new HashMap<Integer, ArrayList<Pattern>>();
+		replacementsMap = new HashMap<Integer, HashMap<String,String>>();
+	}
+	
+	
+	public void addPattern(int position, Pattern pattern) {
+		if (!patternMap.containsKey(position)) {
+			patternMap.put(position, new ArrayList<Pattern>());
+		}
+		
+		patternMap.get(position).add(pattern);
+		
+	}
+	
+	public void addReplacement(int position, String what, String with) {
+		if (!replacementsMap.containsKey(position)) {
+			replacementsMap.put(position, new HashMap<String, String>());
+		}
+		
+		replacementsMap.get(position).put(what, with);
+		
+	}
+
+
+	public void processPatterns(String data, Writter writter) {
+		StringBuilder sb = new StringBuilder();
+		
+		for (int pos = 1; pos <= patternMap.keySet().size(); pos++) {
+			ArrayList<Pattern> patternList = patternMap.get(pos);
+			
+			String value = getDataFromPatterns(data, patternList);
+			
+			if (replacementsMap.containsKey(pos)) {
+				HashMap<String, String> replacements = replacementsMap.get(pos);
+				for (String key : replacements.keySet()) {
+					value = value.replaceAll(key, replacements.get(key));
+				}
+			}
+			
+			sb.append(Patterns.formatValue(value));
+		}
+		
+		
+		
+		
+		writter.writeLine(sb.toString());
+		
+	}
+	
+	private String getDataFromPatterns(String data, ArrayList<Pattern> patternList) {
+		String value = "";
+		
+		for (Pattern pattern : patternList) {
+			value = Patterns.findInString(data, pattern);
+			if (value.equals("")) {
+				continue;
+			} else {
+				break;
+			}
+		}
+		
+		return value;
+	}
+	
+}

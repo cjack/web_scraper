@@ -1,0 +1,22 @@
+package bots.australia_jarris;
+
+import java.io.FileReader;
+import java.util.Properties;
+
+public class StartClass {
+	
+	public static void main(String[] args) {
+		try {
+			Properties p = new Properties();
+			p.load(new FileReader("properties/properties.txt"));
+			
+			System.out.println("Starting scrape for date " + p.getProperty("date"));
+		//	new Magistratesvic(p.getProperty("date")).start();
+		//	new Lawlink(p.getProperty("date")).start();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+	}
+
+}

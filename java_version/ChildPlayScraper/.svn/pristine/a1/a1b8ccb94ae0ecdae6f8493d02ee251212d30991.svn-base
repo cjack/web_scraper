@@ -1,0 +1,183 @@
+package bots;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.regex.Pattern;
+
+import util.PatternProcessor;
+import util.Writter;
+
+import master.Master;
+
+public class PlaygroundFinder extends Master {
+
+	private Pattern browseByStatePattern;
+	private Pattern browseByStateWrapperPattern;
+	private String browseByStateWrapper;
+	private ArrayList<String[]> states;
+	private Pattern playgroundWrapperPattern;
+	private Pattern playgroundLinkPattern;
+	private ArrayList<String> playgroundLinks;
+	private String detHtml;
+	private Pattern idPattern;
+	private String id;
+	private Pattern latLonPattern;
+	private String[] latLon;
+	private Pattern addressPattern;
+	private String[] address;
+	private Pattern imagesWrapperPattern;
+	private Pattern imagePattern;
+	private String imageWrapper;
+	private ArrayList<String> images;
+	private Pattern addressPattern2;
+	private String address2;
+
+	public PlaygroundFinder() {
+		
+		pProc = new PatternProcessor();
+	
+		browseByStateWrapperPattern = Pattern.compile("<div id=\"browseByState\">(.+?)</div>\\s+</div>", Pattern.DOTALL);
+		browseByStatePattern = Pattern.compile("<a href=\"(.+?)\">(.+?)</a>");
+		
+		playgroundWrapperPattern = Pattern.compile("<div id=\"playgroundContainer\"(.+?)<div class=\"footer\">", Pattern.DOTALL);
+		playgroundLinkPattern = Pattern.compile("<div class=\"playgroundPhoto\"><a href=\"(.+?)\"");
+		
+		idPattern = Pattern.compile("playgroundid=(\\d+)");
+		latLonPattern = Pattern.compile("div class=\"smallmap\">.+?img src=.+?center=(.+?),(.+?)\\&");
+		addressPattern = Pattern.compile("div class=\"smallmap\">.+?</a>.+?p style.+?>(.+?)<br/>(.+?)<br/>\\s*(.*?)\\s*</p>", Pattern.DOTALL);
+		addressPattern2 = Pattern.compile("<div id=\"address\">.+?p style.+?>(.+?)</p>", Pattern.DOTALL);
+		imagesWrapperPattern = Pattern.compile("<div id=\"playgroundphotos\"(.+?)</div>\\s*<div id=\"details\"", Pattern.DOTALL);
+		imagePattern = Pattern.compile("img src=\"(.+?)\"");
+		
+		pProc.addPattern(3, Pattern.compile("<div id=\"details\">\\s+<h1>(.+?)\\s*</h1>"));
+		pProc.addReplacement(7, "<.+?>", "");
+		pProc.addReplacement(7, "\\s+", " ");
+		pProc.addReplacement(6, "<.+?>", " ");
+		
+	}
+	
+	public void run() {
+		
+		String html = fetchPageContent("http://www.playgroundfinder.com/");
+		
+		browseByStateWrapper = findInString(html, browseByStateWrapperPattern);
+		
+		states = findAllGroupsInString(browseByStateWrapper, browseByStatePattern);
+		
+		for(String[] state : states) {
+			
+			String writterName = state[1].toLowerCase();
+			writterName = writterName.replaceAll("\\s+", "_");
+			writter = new Writter(writterName + ".csv");
+			
+			writter.writeLine("URL,ID,Name,Lat,Lon,Address,Notes");
+			
+			String stateHtml = fetchPageContent("http://www.playgroundfinder.com/" + state[0]);
+			
+			playgroundLinks = findAllInString(stateHtml, playgroundLinkPattern);
+			
+			for(String link : playgroundLinks) {
+				
+				System.out.println(link);
+				
+				id = findInString(link, idPattern);
+				
+				pProc.addData(1, "http://www.playgroundfinder.com/" + link);
+				pProc.addData(2, id);
+				
+				detHtml = fetchPageContent("http://www.playgroundfinder.com/" + link);
+				
+				write(detHtml, id);
+				
+				sleep(500);
+			}
+			
+		}
+		
+	}
+	
+	public void write(String data, String id) {
+		
+		latLon = findGroupsInString(data, latLonPattern, 2);
+		
+		if(latLon != null) {
+			pProc.addData(4, latLon[0]);
+			pProc.addData(5, latLon[1]);
+		}
+		else {
+			pProc.addData(4, "");
+			pProc.addData(5, "");
+		}
+		
+		address = findGroupsInString(data, addressPattern, 3);
+			
+		if(address != null) {
+			pProc.addData(6, address[0] + " " + address[1]);
+			pProc.addData(7, address[2]);
+		}
+		else {
+			
+			address2 = findInString(data, addressPattern2);
+			
+			if(address2 != null) {
+				pProc.addData(6, address2);
+				pProc.addData(7, "");
+			}
+			else {
+				pProc.addData(6, "");
+				pProc.addData(7, "");
+			}
+			
+		}
+		
+		imageWrapper = findInString(data, imagesWrapperPattern);
+		
+		images = findAllInString(imageWrapper, imagePattern);
+		
+		if(!images.isEmpty()) {
+			int i = 1;
+			
+			for(String image : images) {
+				try {	
+					File f = new File ("imagesPlaygroundFinder/");
+					if (!f.exists()) {
+						f.mkdirs();
+					}
+					saveImage(image, "imagesPlaygroundFinder/" + id + "_" + i + ".jpg");
+					i++;
+				} catch (IOException e2) {
+					// TODO Auto-generated catch block
+					e2.printStackTrace();							
+				}	
+			}
+		}
+				
+		pProc.processPatterns(data, writter);
+	}
+	
+	public static void saveImage(String imageUrl, String destinationFile) throws IOException {
+		URL url = new URL(imageUrl);
+		InputStream is = url.openStream();		
+		OutputStream os = new FileOutputStream(destinationFile);
+
+		byte[] b = new byte[2048];
+		int length;
+
+		while ((length = is.read(b)) != -1) {
+			os.write(b, 0, length);
+		}
+
+		is.close();
+		os.close();
+	}
+	
+	public static void main(String[] args) {
+		new PlaygroundFinder().run();
+	}
+
+}

@@ -1,0 +1,325 @@
+package bots;
+
+import master.Master;
+import util.*;
+
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.*;
+
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVRecord;
+import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.methods.GetMethod;
+
+public class FlightShoes extends Master {
+
+	private int addPrice;
+	
+	public FlightShoes(Integer firstPage, Integer lastPage) {		
+		this();
+		firstPageNumber = firstPage;
+		lastPageNumber = lastPage;
+	}
+	
+	public FlightShoes() {		
+		loadPatike();
+		writter = new Writter("flightclub_temp.csv");
+		
+		pProc = new PatternProcessor();
+		firstPageNumber = 1;
+		pageIncrement = 1;
+		
+		Properties props = new Properties();
+		
+		try {
+			props.load(new FileReader("flightclub_settings.txt"));		
+			addPrice = Integer.parseInt(props.getProperty("addPrice"));
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+		paginationPattern = Pattern.compile("pg-inactive next");
+		
+		pProc.addData(1, "");
+		pProc.addData(2, "");
+		pProc.addData(5, "");
+		pProc.addData(7, "");		
+	//	pProc.addData(10, "");
+		pProc.addData(11, "");
+		pProc.addData(12, "");
+		pProc.addData(13, "");
+		pProc.addData(15, "");
+	}	
+	
+	private HashMap<String, CSVRecord> patikeMap = new HashMap<String, CSVRecord>();
+
+	private void loadPatike() {
+		try {
+			Reader in = new FileReader("flightclub.csv");
+	    	Iterable<CSVRecord> records = CSVFormat.EXCEL.parse(in);
+	    	int count = 0;
+	    	for (CSVRecord record : records) {
+	    		count++;
+	    		if (count <= 1) continue;
+	    	    String theCell = record.get(2);
+	    	    patikeMap.put(theCell, record);	    			    	    
+	    	}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+	}
+
+	public static void main(String[] args) {
+		if (args.length == 2) {
+			new FlightShoes(Integer.parseInt(args[0]), Integer.parseInt(args[1])).start();
+		} else {
+			new FlightShoes().start();
+		}
+		
+	}
+	
+	private void mergeCSVs() {
+		ArrayList<String> lines = Files.loadListFromFile("flightclub_temp.csv");
+		writter = new Writter("flightclub.csv");
+		writter.writeLine("InventoryAction,Site,SellerSKU,Location,Location Priority,Title,Condition,Quantity,Price,Product ID,Product Type,ItemWeight,Group Name,Cost,Price (default),Price (floor),Price (ceiling),MAP Price,Price (retail),Pricing Name,Vendor Name,Model Number,Brand,Attribute1,MinListing Buffer,MaxListing Buffer");
+		
+		for (String line : lines) {
+			writter.writeLine(line);
+		}
+				
+		for (String key : patikeMap.keySet()) {
+			CSVRecord rec = patikeMap.get(key);
+			String title = rec.get(5);
+			
+			pProc.addData(3, key);
+			pProc.addData(6, title);
+			pProc.addData(8, "0");
+			pProc.addData(9, rec.get(8));
+			pProc.addData(14, rec.get(13));
+			pProc.addData(16, rec.get(15));
+			
+			pProc.processPatterns("", writter);
+		}
+		
+		writter.close();
+	}
+
+	@Override
+	public void run() {
+		
+		ArrayList<String> categories = new ArrayList<String>();
+		categories.add("http://www.flightclub.com/catalog/category/ajaxview?id=34&p=");
+		categories.add("http://www.flightclub.com/catalog/category/ajaxview?id=62&p=");
+		categories.add("http://www.flightclub.com/catalog/category/ajaxview?id=17&p=");
+		
+		httpClient = new HttpClient();
+		
+		for (String cat : categories) {
+			firstPageNumber = 1;
+			incrementPartOneURL = cat;
+			typeOneProcessing();
+		}
+		
+		writter.close();
+		mergeCSVs();
+		
+		System.out.println("FINISHED");
+		
+	}
+	
+	private Pattern productUrlPattern = Pattern.compile("<div class=\\\\\"item-container\\\\\">\\\\n\\s+<a href=\\\\\"(.+?)\\\\\"");
+	private Pattern sizesWrapPattern = Pattern.compile("<ul class=\"list-size hide\">(.+?)</ul>", Pattern.DOTALL);
+	private Pattern namePattern = Pattern.compile("<h1>(.+?)<");
+	private Pattern productWrapPattern = Pattern.compile("('\\d+':\\{'qty':.+?'size'\\})");
+	private Pattern productDetailsPattern = Pattern.compile("'(\\d+)':\\{'qty':(.+?),.+?flawless':(.+?),.+?'price':'\\$(.+?)'.+?'size':'(.+?)','id':(\\d+)");
+	private Pattern productIdPattern = Pattern.compile("data-confProductId=\"(\\d+)\"");
+	private Pattern styleIdPattern = Pattern.compile("<span class=\"attribute-label\">Style ID:</span>(.+?)\\s+[<,]");
+	private Pattern locationPattern = Pattern.compile("serialized_inventory':\\{'.+?':\\{'location':'(.+?)'");
+	
+	protected void typeOneProcessing() {
+		paginationURL = null;
+		detailsPageURL = null;
+		String pageHtml = null;
+		String detailsPageHtml = null;
+
+		int count = 1;
+		
+		HashSet<String> skuSet = new HashSet<String>();
+		
+		mainLoop: for (int i = firstPageNumber; i <= lastPageNumber; i += pageIncrement) {
+			paginationURL = incrementPartOneURL + formParam + formValue + pageNumberParam + i + incrementPartTwoURL;
+			pageHtml = fetchPageContent(paginationURL);
+			
+		//	System.out.println(pageHtml);
+			
+			System.out.println(paginationURL);
+
+			if (pageHtml != null) {
+				
+				ArrayList<String> productUrls = findAllInString(pageHtml, productUrlPattern);
+				
+				for (String productURL : productUrls) {
+					productURL = productURL.replace("\\", "");
+					System.out.println("\t" + count++ + ". Fetching: " + productURL);
+					
+					GetMethod get = new GetMethod(productURL);
+					get.setRequestHeader("Host", "www.flightclub.com");
+					get.setRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:38.0) Gecko/20100101 Firefox/38.0");
+					get.setRequestHeader("Cache-Control", "max-age=0");
+					get.setRequestHeader("Accept-Language", "sr,sr-RS;q=0.8,sr-CS;q=0.6,en-US;q=0.4,en;q=0.2");
+					get.setRequestHeader("Accept-Encoding", "gzip, deflate");
+					get.setRequestHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+					
+					int retryCount = 0;
+					
+					while (retryCount <= 5) {
+						retryCount++;
+						try {						
+							httpClient.executeMethod(get);
+							detailsPageHtml = getDataFromStream(get.getResponseBodyAsStream(), true);
+							if (detailsPageHtml != null) {
+								break;
+							} else {
+								sleep(5000);
+								continue;
+							}
+						} catch (Exception e) {
+							sleep(5000);
+							continue;
+						}
+					}
+
+					String productName = findInString(detailsPageHtml, namePattern);
+					String sizesWrap = findInString(detailsPageHtml, sizesWrapPattern);
+				//	System.out.println(variantsWrap);
+					
+					String produtId = findInString(detailsPageHtml, productIdPattern);
+					String styleId = findInString(detailsPageHtml, styleIdPattern);
+					
+					ArrayList<String> allProducts = findAllInString(detailsPageHtml, productWrapPattern);
+					
+					for (String singleProduct : allProducts) {
+						
+						//System.out.println(singleProduct);
+						
+						String location = findInString(singleProduct, locationPattern);
+						if(!location.equals("")) {
+							pProc.addData(4, location);
+						}
+						else {
+							pProc.addData(4, "");
+						}
+	
+						String [] variant = findGroupsInString(singleProduct, productDetailsPattern, 6);
+						
+						if (variant == null) continue;
+						
+						String flawless = variant[2];
+						if (!flawless.equals("true")) continue;			
+						
+						String quantity = variant[1];
+						if (quantity.equals("0")) continue;
+						
+						String title = productName + ", Size " + variant[4];
+						title = title.replaceAll("\\&quot;", "'");
+						String price = "0";
+						
+						price = variant[3].replaceAll(",", "");
+						
+						String available = quantity;						
+						
+						String sku = produtId + "-" + variant[0];
+						
+						if (skuSet.contains(sku)) continue;
+						
+						skuSet.add(sku);
+						
+						double priceD = Double.parseDouble(price);
+						String priceS = String.format("%.2f", priceD);
+						
+						double price40 = priceD * 1.4 + addPrice;
+						if (price40 == (double)addPrice) price40 = 0;
+						String price40S = String.format("%.2f", price40);
+						
+						pProc.addData(3, sku);
+						pProc.addData(6, title);
+						pProc.addData(8, available);
+						pProc.addData(9, "="+price40S);
+						pProc.addData(10, styleId);
+						pProc.addData(14, "="+priceS);
+						pProc.addData(16, "="+price40S);
+						
+						pProc.processPatterns(detailsPageHtml, writter);
+						
+						if (patikeMap.containsKey(sku)) {
+							patikeMap.remove(sku);
+						}
+						
+					}
+					
+					sleep(requestDelay);
+					
+				}
+				
+				sleep(requestDelay);
+				
+				
+				Matcher paginationMatcher = paginationPattern.matcher(pageHtml);
+				if (paginationMatcher.find()) {
+					break;					
+				}
+			} 
+		}
+	}
+	
+	public String fetchPageContent(String fromPage) {
+		
+		if (httpClient == null) {
+			httpClient = new HttpClient();
+			httpClient.getHttpConnectionManager().getParams().setConnectionTimeout(60000); 
+			httpClient.getHttpConnectionManager().getParams().setSoTimeout(60000);
+		}
+		
+		int retryCount = 0;
+			
+		while (retryCount <= 5) {
+			retryCount++;
+			try {			
+				GetMethod get = new GetMethod(fromPage);
+				get.setRequestHeader("User-Agent", "Mozilla/5.0 (X11; U; Linux x86_64; en-US; rv:1.9.0.8) Gecko/2009032712 Ubuntu/8.10 (intrepid) Firefox/3.0.8");
+				httpClient.executeMethod(get);
+				
+				StringBuilder sb = new StringBuilder();
+				String line;
+				BufferedReader in = new BufferedReader(new InputStreamReader(get.getResponseBodyAsStream(), "utf-8"));
+				while ((line = in.readLine()) != null) {
+					sb.append(line).append("\n");
+				}
+				
+				in.close();
+				get.releaseConnection();
+				
+				return sb.toString();				
+			} catch (Exception e) {
+				sleep(5000);
+				continue;
+			}
+		}
+		
+		return null;
+	}
+	
+	@Override
+	public void write (String data) {
+		
+	}
+	
+}
+
+

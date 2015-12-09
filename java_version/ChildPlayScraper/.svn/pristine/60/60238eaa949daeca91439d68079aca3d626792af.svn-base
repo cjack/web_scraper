@@ -1,0 +1,206 @@
+package bots;
+
+import java.io.File;
+import java.util.ArrayList;
+import java.util.regex.Pattern;
+
+import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.methods.GetMethod;
+import org.unbescape.html.HtmlEscape;
+
+import util.Files;
+import util.PatternProcessor;
+import util.Utils;
+import util.Writter;
+
+import master.Master;
+
+public class BrandTechScraper extends Master{
+
+	private String text;
+	private Pattern websiteUrlPattern;
+	private Pattern catalogNumberPattern;
+	private Pattern descCatNumPriceWrapperPattern;
+	private Pattern trWrapperPattern;
+	private Pattern tdPattern;
+	private Pattern categoriesWrapperPattern;
+	private Pattern categoriesPattern;
+	private Pattern descriptionPattern;
+	private Pattern orderingInformationPattern;
+	private String websiteUrl;
+	private String categoriesWrapper;
+	private ArrayList<String> categories;
+	private String description;
+	private Pattern easySelectionPattern;
+	private Pattern sampleProgramPattern;
+	private Pattern customPackingPattern;
+	private String easySelection;
+	private String sampleProgram;
+	private String customPacking;
+	private String descCatPrice;
+	private ArrayList<String> trWrappers;
+	private ArrayList<String> tds;
+	private String size;
+	private String orderingInformation;
+	private Pattern namePattern;
+	private String name;
+	private Pattern namePattern2;
+	private Pattern namePattern3;
+	private Pattern namePattern4;
+
+
+	public BrandTechScraper() {
+		
+		writter = new Writter("brandtech.csv");
+		writter.writeLine("Website URL,Catalog Number,Product Name,Category 1,Category 2,Description,Size,Price,Ordering information");
+		
+		pProc = new PatternProcessor();
+		
+		websiteUrlPattern = Pattern.compile("<a href=\"rfq\\.asp\\?prodid=(.+?)\"");
+		descCatNumPriceWrapperPattern = Pattern.compile("<table width=\"95%\" cellspacing=\"0\" cellpadding=\"1\">(.+?)</table>", Pattern.DOTALL);
+		trWrapperPattern = Pattern.compile("<tr valign='top'>(.+?)</tr>", Pattern.DOTALL);
+		tdPattern = Pattern.compile("<td class='text'.+?>(.+?)\\s*<");
+		namePattern = Pattern.compile("<td class='text'.+?>(.+?)\\s*<form",Pattern.DOTALL);
+		categoriesWrapperPattern = Pattern.compile("<div class=\"bookmark\"(.+?)</span>", Pattern.DOTALL);
+		categoriesPattern = Pattern.compile("<a href.+?>(.+?)<");
+		descriptionPattern = Pattern.compile("<span style=\"float:right; font-family:Arial, Helvetica, sans-serif; font-size:13px; text-align:left; padding-bottom:30px;\">(.+?For more information)", Pattern.DOTALL);
+		easySelectionPattern = Pattern.compile("(<b style=\"mso-bidi-font-weight:normal\"><br><br>Easy Selection.+?<.+?)(?:<b style=\"mso-bidi-font-weight:normal\"><br>|For more information)", Pattern.DOTALL);
+		sampleProgramPattern = Pattern.compile("(<b style=\"mso-bidi-font-weight:normal\"><br><br>Sample Program.+?<.+?)(?:<b style=\"mso-bidi-font-weight:normal\"><br>|For more information)", Pattern.DOTALL);
+		customPackingPattern = Pattern.compile("(<b style=\"mso-bidi-font-weight:normal\"><br><br>Custom Packaging.+?<.+?)(?:<b style=\"mso-bidi-font-weight:normal\"><br>|For more information)", Pattern.DOTALL);
+		orderingInformationPattern = Pattern.compile("<h2 class=\"subHead2\"><b>Ordering Information:</b></h2>(.+?)<p class=\"text\">For more information", Pattern.DOTALL);
+		
+	}
+	
+	public void run() {
+		
+		File folder = new File("csvs");
+		File[] listOfFiles = folder.listFiles();
+
+		for (File file : listOfFiles) {
+		    if (file.isFile()) {
+		       text = Files.loadFileData("csvs/" + file.getName());
+		       write(text);
+		    }
+		}
+		
+	}
+	
+	public void write(String data) {
+		
+		//System.out.println(data);
+		
+		websiteUrl = findInString(data, websiteUrlPattern);
+		websiteUrl = "http://www.brandtech.com/prodpage.asp?prodid=" + websiteUrl;
+		
+		pProc.addData(1, websiteUrl);
+		
+		//System.out.println(websiteUrl);
+		
+		categoriesWrapper = findInString(data, categoriesWrapperPattern);
+		if(!categoriesWrapper.equals("")) {
+			categories = findAllInString(categoriesWrapper, categoriesPattern);
+			
+			if(!categories.isEmpty()) {
+				pProc.addData(4, categories.get(1));
+				pProc.addData(5, categories.get(2));
+			}
+			else {
+				pProc.addData(4, "");
+				pProc.addData(5, "");
+			}
+			
+		}
+		else {
+			pProc.addData(4, "");
+			pProc.addData(5, "");
+		}
+
+		description = findInString(data, descriptionPattern);
+		
+		easySelection = findInString(description, easySelectionPattern);
+		//System.out.println(easySelection);
+		//System.out.println();
+		if(!easySelection.equals("")) {
+			description = description.replace(easySelection, "");
+		}
+		
+		sampleProgram = findInString(description, sampleProgramPattern);
+		//System.out.println(sampleProgram);
+		//System.out.println();
+		if(!sampleProgram.equals("")) {
+			description = description.replace(sampleProgram, "");
+		}
+		
+		customPacking = findInString(description, customPackingPattern);
+		//System.out.println(customPacking);
+		if(!customPacking.equals("")) {
+			description = description.replace(customPacking, "");
+		}
+		
+		//description = HtmlEscape.unescapeHtml(description);
+		//description = description.replaceAll("\n", " ");
+		description = description.replaceAll("\\s+", " ");
+		description = description.replaceAll("<.+?>", "");
+		description = description.replaceAll("�", "");
+		description = description.replaceAll("For more information", "");
+		
+		//System.out.println(description);
+			
+		pProc.addData(6, description);
+		
+		orderingInformation = findInString(data, orderingInformationPattern);
+		orderingInformation = orderingInformation.replaceAll("<.+?>", "");
+		orderingInformation = orderingInformation.replaceAll("�", "");
+		orderingInformation = orderingInformation.replaceAll("&nbsp;", "");
+		
+		//orderingInformation = HtmlEscape.unescapeHtml(orderingInformation);
+		
+		pProc.addData(9, orderingInformation);
+		
+		descCatPrice = findInString(data, descCatNumPriceWrapperPattern);
+		
+		trWrappers = findAllInString(descCatPrice, trWrapperPattern);
+		
+		for(String tr : trWrappers) {
+			
+			//System.out.println(tr);
+			
+			tds = findAllInString(tr, tdPattern);
+			name = findInString(tr, namePattern);
+			
+			/*if(tds.get(0).equals("<b>")) {
+				name = findInString(tr, namePattern);
+				if(name.equals("")) {
+					name = findInString(tr, namePattern2);
+					if(name.equals("")) {
+						name = findInString(tr, namePattern4);
+						if(name.equals("")) {
+							name = findInString(tr, namePattern3);					
+						}
+					}
+				}
+			}*/
+			
+			name = name.replaceAll("�", "");
+			name = name.replaceAll("<.+?>", "");
+			
+			size = name.substring(name.lastIndexOf(",")+1);
+			
+			pProc.addData(7, size);
+			
+			pProc.addData(3, name);
+			pProc.addData(2, tds.get(1));
+			pProc.addData(8, tds.get(2));
+			
+			pProc.processPatterns(data, writter);
+			
+		}
+		
+	
+	}
+	
+	public static void main(String[] args) {
+		new BrandTechScraper().run();
+	}
+
+}

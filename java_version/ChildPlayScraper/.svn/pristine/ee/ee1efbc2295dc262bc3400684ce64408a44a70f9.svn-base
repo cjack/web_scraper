@@ -1,0 +1,286 @@
+package bots;
+
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.net.URLEncoder;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.zip.GZIPInputStream;
+
+import org.apache.commons.httpclient.Cookie;
+import org.apache.commons.httpclient.Header;
+import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.HttpStatus;
+import org.apache.commons.httpclient.cookie.CookiePolicy;
+import org.apache.commons.httpclient.methods.GetMethod;
+import org.apache.commons.httpclient.methods.PostMethod;
+import org.apache.commons.httpclient.params.HttpMethodParams;
+
+import master.Master;
+import util.*;
+
+public class Pagesjaunes extends Master {
+
+	public Pagesjaunes(Integer firstPage, Integer lastPage) {		
+		this();
+		firstPageNumber = firstPage;
+		lastPageNumber = lastPage;
+	}
+	
+	private  HashMap<String, ArrayList<String>> letterMap = new HashMap<String, ArrayList<String>>();
+	
+	public Pagesjaunes() {	
+		firefoxMask = true;
+		useCookies = true;
+		extractLetterList();		
+	}	
+	
+	String [] letters = new String [] {"B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"};
+
+	private void extractLetterList() {		
+		
+		getCookies();
+		
+		for (String letter : letters) {
+			httpClient = new HttpClient();
+			postPageURL = "http://www.pagesjaunes-dz.com/rubrics.php";
+			paginationPattern = Pattern.compile("value=\".+?\"/>.+?>(.+?)<");
+			
+			firstPageNumber = 0;
+			pageIncrement = 20;
+			
+			pageNumberParam = "nbligne";
+			
+			postMethodParams = new HashMap<String, String>();
+			postMethodParams.put("rubq", letter);
+			
+			letterMap.put(letter, new ArrayList<String>());
+			
+			System.out.println("Processing letter " + letter);
+			postMethodProcessing(letter);
+		}	
+	}
+	
+	private void getCookies() {
+		try {
+			httpClient = new HttpClient();
+			GetMethod get = new GetMethod("");
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+	}
+
+	Pattern idNamePattern = Pattern.compile("value=\"(.+?)\"/>.+?>(.+?)<");
+	
+	protected void postMethodProcessing(String letter) {
+		paginationURL = null;
+		detailsPageURL = null;
+		String pageHtml = null;
+
+		Matcher paginationMatcher;
+
+		mainLoop: for (int i = firstPageNumber; i <= lastPageNumber; i += pageIncrement) {
+			postMethodParams.put(pageNumberParam, pageNumberValuePartOne + i + pageNumberValuePartTwo);
+			pageHtml = getHtmlByPost();
+		//	System.out.println(pageHtml);
+
+			if (pageHtml != null) {
+
+				ArrayList<String[]> categories = findAllGroupsInString(pageHtml, idNamePattern);
+				
+				for (String [] cat : categories) {
+					letterMap.get(letter).add(cat[0] + "~" + cat[1]);
+				}
+					
+			//	break mainLoop;
+				
+				paginationMatcher = paginationPattern.matcher(pageHtml);
+				if (!paginationMatcher.find()) {
+					break;
+				}
+			} 
+		}
+	}
+
+	public static void main(String[] args) {
+		if (args.length == 2) {
+			new Pagesjaunes(Integer.parseInt(args[0]), Integer.parseInt(args[1])).start();
+		} else {
+			new Pagesjaunes().start();
+		}
+		
+	}
+
+	@Override
+	public void run() {
+		
+		pProc = new PatternProcessor();
+		writter = new Writter("paginasjaunes.csv");
+		
+		writter.writeLine("Category, Title, Address, Zip Code, City, Country, Mobile, Phone, Fax");
+		
+		pProc.addPattern(2, Pattern.compile("<div class=\"org\" id=\"raison\".+?/div>.*?(?:<b>|<i>)(.+?)(?:<|:)"));
+		pProc.addPattern(3, Pattern.compile("<div class=\"street-address\">(.+?),<"));
+		pProc.addPattern(4, Pattern.compile("<div class=\"postal-code\">(.+?)<"));
+		pProc.addPattern(5, Pattern.compile("<div class=\"locality\">(.+?)<"));
+		pProc.addPattern(6, Pattern.compile("<div class=\"country-name\">(.+?)<"));
+		pProc.addPattern(7, Pattern.compile("<li\\s+class=\"li_tel phone\".+?>(.+?)<"));
+		pProc.addPattern(8, Pattern.compile("<li\\s+class=\"li_tel tel\".+?>(.+?)<"));
+		pProc.addPattern(9, Pattern.compile("<li\\s+class=\"li_tel fax\".+?>(.+?)<"));	
+		
+		firstPageNumber = 1;
+		pageIncrement = 1;
+		
+		detailsPagePattern = Pattern.compile("<div id=\"profile\">(.+?)</div></div></div>", Pattern.DOTALL);
+		paginationPattern = detailsPagePattern;
+		
+		incrementPartOneURL = "http://www.pagesjaunes-dz.com/index.php?listeresultat=1&type_rech=activite&zone_quoi=Les%20rubriques%20par%20ordre%20alphab%E9tique&zone_ou=Toutes&pages_cou=";
+				
+		for (String letter : letters) {
+			ArrayList<String> cats = letterMap.get(letter);
+			
+			int catCount = cats.size();
+			int currCat = 1;
+			
+			for (String cat : cats) {
+				String parts [] = cat.split("~");
+				
+				System.out.println("Letter " + letter + " Cat " + currCat++ + "/" + catCount);
+				
+				incrementPartTwoURL = "&rubrique_spec%5B%5D=" + parts[0];
+				
+				pProc.addData(1, parts[1]);
+				
+				typeOneProcessing();
+				
+			}
+		}
+	}
+	
+	protected void typeOneProcessing() {
+		paginationURL = null;
+		detailsPageURL = null;
+		String pageHtml = null;
+		String detailsPageHtml = null;
+
+
+		Matcher paginationMatcher;
+		Matcher urlMatcher;
+
+		mainLoop: for (int i = firstPageNumber; i <= lastPageNumber; i += pageIncrement) {
+			paginationURL = incrementPartOneURL + i + incrementPartTwoURL;
+		//	paginationURL = URLEncoder.encode(paginationURL);
+			int tries = 0;
+			
+			while (true) {
+				pageHtml = getHtmlWithCookies(paginationURL);
+				if (pageHtml != null) break;
+				
+				tries++;
+				if (tries == 5) {
+					sleep(5000);
+					continue mainLoop;
+				}
+			}
+			
+			
+		//	System.out.println(pageHtml);
+
+			if (pageHtml != null) {
+				System.out.println("-Pagination page: " + paginationURL);
+				urlMatcher = detailsPagePattern.matcher(pageHtml);
+
+				while (urlMatcher.find()) {
+					detailsPageHtml = urlMatcher.group(1);	
+				//	System.out.println(detailsPageHtml);
+
+					if (detailsPageHtml != null) {
+						write(detailsPageHtml);
+						recordCount++;
+						newRecordsCount++;
+					}
+					
+					sleep(requestDelay);
+				}
+				paginationMatcher = paginationPattern.matcher(pageHtml);
+				if (!paginationMatcher.find()) {
+					break;
+				}
+			} 
+		}
+	}
+	
+	protected String getHtmlWithCookies(String url) {
+		if (httpClient == null) {
+			httpClient = new HttpClient();
+		}
+		BufferedReader br;
+		StringBuffer html = new StringBuffer();
+		String temp;
+		GetMethod method = new GetMethod(url);
+		method.setFollowRedirects(false);
+
+	//	params.setSoTimeout(60000);
+	//	method.setCookiePolicy(CookiePolicy.DEFAULT);
+
+		if (!firefoxMask) {
+			method.setRequestHeader(HttpMethodParams.USER_AGENT, "Ooyyo/1.0 (Used and new cars search engine; http://www.ooyyo.com/en/static/content/5/about-us/index.html; contacts@ooyyo.com)");
+		} else {
+			method.setRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:33.0) Gecko/20100101 Firefox/33.0");
+		}	
+
+		method.setRequestHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+		method.setRequestHeader("Accept-Encoding", "gzip, deflate");		
+		method.setRequestHeader("Host", "www.pagesjaunes-dz.com");	
+		method.setRequestHeader("Cookie", "langkookie=fr; PJDZ0=activite|Les rubriques par ordre alphabÃ©tique|Toutes|10; PJDZ1=activite|Restaurants|Toutes|200");
+		
+		httpClient.getState().addCookie(new Cookie("www.pagesjaunes-dz.com", "PJDZ0", "activite|Les rubriques par ordre alphabétique|Toutes|10"));
+				
+		try {
+			int statusCode = httpClient.executeMethod(method);
+			
+//			for (Header h : method.getRequestHeaders()) {
+//				System.out.println(h.getName() + " - " + h.getValue());
+//				if (h.getValue().contains("frontend")) {
+//				//	cookie = h.getValue() + "; currency=GBP";
+//				}
+//			}
+//			
+//			System.out.println("Response");
+//			for (Header h : method.getResponseHeaders()) {
+//				System.out.println(h.getName() + " - " + h.getValue());
+//				if (h.getValue().contains("frontend")) {
+//				//	cookie = h.getValue() + "; currency=GBP";
+//				}
+//			}
+			
+			if (statusCode == HttpStatus.SC_OK) {
+				br = new BufferedReader(new InputStreamReader(new GZIPInputStream(method.getResponseBodyAsStream()), "iso-8859-1"));
+				while ((temp = br.readLine()) != null) {
+					html.append(temp).append("\n");
+				}
+
+				br.close();
+				return html.toString();
+			} else {
+				return null;
+			}
+		} catch (Exception e) {
+			System.err.println("#### GREŠKA ZA: " + url + " ####");
+			e.printStackTrace();			
+			return null;
+		}
+	}
+	
+	@Override
+	public void write (String data) {
+		pProc.processPatterns(data, writter);
+	}
+	
+}
+
+

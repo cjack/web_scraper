@@ -1,0 +1,209 @@
+package bots;
+
+import java.util.ArrayList;
+import java.util.Collections;
+
+public class Term {
+	public static final int LEFT = 0;
+	public static final int RIGHT = 1;
+	public static final int BOTH_SIDES = 2;
+
+//	public static final int MAKE = 0;
+//	public static final int MODEL = 1;
+//	public static final int VOLUME = 3;
+//	public static final int MISC = 4;
+//	public static final int YEAR_RELATED = 2;
+//	public static final int DIST_RELATED = 5;
+//	public static final int PRICE_RELATED = 6;
+//	public static final int NUMBER = 7;
+//	public static final int LOCATION = 8;
+//	public static final int POSTCODE = 9;
+//	public static final int BODY_TYPE = 10;
+//	public static final int FUEL_TYPE = 11;
+//	public static final int TRANSMISSION = 12;
+//	public static final int COLOR = 13;
+//	public static final int TRIM = 14;
+//	public static final int HORSEPOWER = 15;
+//	public static final int VOLUMECC = 16;
+//	public static final int STATE = 17;
+	
+	public static final int MAKE = 0;
+	public static final int MODEL = 1;
+	public static final int VOLUME = 2;
+	public static final int TRIM = 3;
+	public static final int YEAR_RELATED = 4;
+	public static final int DIST_RELATED = 5;
+	public static final int PRICE_RELATED = 6;
+	public static final int NUMBER = 7;
+	public static final int LOCATION = 8;
+	public static final int POSTCODE = 9;
+	public static final int BODY_TYPE = 10;
+	public static final int FUEL_TYPE = 11;
+	public static final int TRANSMISSION = 12;
+	public static final int COLOR = 13;
+	public static final int MISC = 14;
+	public static final int HORSEPOWER = 15;
+	public static final int VOLUMECC = 16;
+	public static final int STATE = 17;
+
+	private String term;
+	private ArrayList<Integer> types;
+	private ArrayList<Term> linksTo;
+	private boolean canBeLast;
+	private int termPosition;
+
+	public Term(String name, int type, boolean last) {
+		this.term = name;
+		types = new ArrayList<Integer>(1);
+		types.add(type);
+		this.canBeLast = last;
+		linksTo = new ArrayList<Term>(1);
+	}
+
+	public String getTermName() {
+		return term;
+	}
+
+	public void setName(String name) {
+		this.term = name;
+
+	}
+
+	public ArrayList<Integer> getTypes() {
+		return types;
+	}
+
+	public boolean contains(String term) {
+		for (Term t : linksTo) {
+			if (t.getTermName().equals(term))
+				return true;
+		}
+		return false;
+	}
+
+	public Term contains(String[] multiTerm) {
+		try {
+			Term t = this;
+			for (int pos = 1; pos < multiTerm.length; pos++) {
+				if (t.contains(multiTerm[pos])) {
+					t = t.getTerm(multiTerm[pos]);
+				} else
+					return null;
+
+			}
+			if (t.canBeLast)
+				return t;
+			else {
+				try {
+					Integer.parseInt(t.getTermName());
+					t = new Term(t.getTermName(), NUMBER, true);
+					return t;
+				} catch (Exception e) {
+					return null;
+				}
+			}
+				
+		} catch (Exception e) {
+			System.out.println();
+		}
+		return null;
+	}
+
+	public boolean isEmpty() {
+		return linksTo.isEmpty();
+	}
+
+	public Term getTerm(String term) {
+		for (Term t : linksTo) {
+			if (t.getTermName().equals(term))
+				return t;
+		}
+
+		return null;
+	}
+
+	public void addTerm(Term term) {
+		linksTo.add(term);
+
+	}
+
+	public void printTerms() {
+		System.out.print(term + " ");
+		for (Term t : linksTo) {
+			if (!t.isEmpty())
+				t.printTerms();
+
+			else {
+				System.out.println();
+
+			}
+		}
+
+	}
+
+	public boolean canBeLast() {
+		return canBeLast;
+	}
+
+	public String toString() {
+		return term;
+	}
+
+	public void setCanBeLast(boolean value) {
+		this.canBeLast = value;
+	}
+
+	public void addType(int type) {
+		if (!types.contains(type)) {
+			types.add(type);
+			if (types.size() > 1)
+				Collections.sort(types);
+		}
+
+	}
+
+	public void setTermPosition(int position) {
+		this.termPosition = position;
+	}
+
+	public int getPosition() {
+		return termPosition;
+	}
+
+	public static boolean canBeLeft(int position) {
+		if (position == LEFT || position == BOTH_SIDES)
+			return true;
+
+		return false;
+	}
+
+	public static boolean canBeRight(int position) {
+		if (position == RIGHT || position == BOTH_SIDES)
+			return true;
+
+		return false;
+	}
+
+	public static int getTermValue(String value) {
+		if (value.equals("Trim")) {
+			return TRIM;
+		} else if (value.equals("Grad")) {
+			return LOCATION;
+		} else if (value.equals("Prenos")) {
+			return TRANSMISSION;
+		} else if (value.equals("Gorivo")) {
+			return FUEL_TYPE;
+		} else if (value.equals("Karoserija")) {
+			return BODY_TYPE;
+		} else if (value.equals("Boja")) {
+			return COLOR;
+		} else if (value.equals("Cena")) {
+			return PRICE_RELATED;
+		} else if (value.equals("Presao")) {
+			return DIST_RELATED;
+		} else {
+			return -1;
+		}
+	}
+
+}

@@ -1,0 +1,54 @@
+package bots;
+
+import java.util.ArrayList;
+import java.util.regex.Pattern;
+
+import master.Master;
+import util.*;
+
+public class Prince1 extends Master {
+
+	public Prince1() {		
+		writter = new Writter("output.csv");
+				
+	}		
+
+	public static void main(String[] args) {		
+		new Prince1().start();
+	}
+	
+	private Pattern imagePattern = Pattern.compile("changeImg\\('(.+?)'");
+	private Pattern imagePattern2 = Pattern.compile("<img id=\"theimg\" src=\"(.+?)\"");
+	private int count = 0;
+	
+	@Override
+	public void run() {
+		ArrayList<String> skus = Files.loadListFromFile("input.txt", 1);
+		
+		for (String sku : skus) {
+			System.out.println(++count + ". " + "http://www.entaonline.com/product/_" + sku + ".htm");
+			String pageHtml = fetchPageContent("http://www.entaonline.com/product/_" + sku + ".htm");
+			
+			sleep(1000);
+			
+			if (pageHtml != null) {
+				ArrayList<String> images = findAllInString(pageHtml, imagePattern);
+				if (images.size() == 0) {
+					images = findAllInString(pageHtml, imagePattern2);
+				}
+				writter.writeLine(sku + "," +  Utils.joinStringFromArray(images, ","));
+			}
+		}
+		
+		writter.close();
+		
+	}
+	
+	@Override
+	public void write (String data) {
+		
+	}
+	
+}
+
+

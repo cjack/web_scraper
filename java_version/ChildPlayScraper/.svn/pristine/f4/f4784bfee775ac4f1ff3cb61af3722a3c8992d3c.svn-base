@@ -1,0 +1,141 @@
+package bots;
+
+import master.Master;
+import util.*;
+
+import java.io.FileReader;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.*;
+
+public class GelbeSeiten extends Master {
+	
+	private String what;
+	private String where;
+	private String distance;
+	
+	private boolean hasWhere = true;
+	private boolean hasDistance = false;
+
+	public GelbeSeiten(Integer firstPage, Integer lastPage) {		
+		this();
+		firstPageNumber = firstPage;
+		lastPageNumber = lastPage;
+	}
+	
+	private Pattern postCodePattern = Pattern.compile("<span itemprop=\"postalCode\">(.+?)<");
+	private Pattern cityPattern = Pattern.compile("<span itemprop=\"addressLocality\">(.+?)<");
+	
+	private Pattern detailsWrap = Pattern.compile("<div class=\"hidden-xs left\" >(.+?)<div class=\"outer_footer\">", Pattern.DOTALL);
+	
+	public GelbeSeiten() {		
+		try {
+			Properties p = new Properties();
+			p.load(new FileReader("values.txt"));
+			
+			what = p.getProperty("what");
+			where = p.getProperty("where");
+			distance = p.getProperty("distance");
+			
+			if (where.trim().equals("")) {
+				hasWhere = false;
+			}
+			
+			if (!distance.trim().equals("")) {
+				hasDistance = true;
+				distance += "000";
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+		writter = new Writter("output_" + what + "_" + where + ".csv");
+		writter.writeLine("Name,Street,City,Email");
+		pProc = new PatternProcessor();
+		
+		pProc.addPattern(1, Pattern.compile("<span itemprop=\"name\">(.+?)<"));
+		pProc.addPattern(2, Pattern.compile("<span itemprop=\"streetAddress\">(.+?)<"));
+		pProc.addReplacement(2, "\\&nbsp;", " ");
+		
+		pProc.addPattern(4, Pattern.compile("itemprop=\"email\">(.+?)<"));
+		
+		pageIncrement = 1;
+		firstPageNumber = 1;
+		charset = "iso-8859-1";
+		
+		paginationPattern = Pattern.compile("<button class=\"gs_seite_vor");
+		
+	}	
+
+	public static void main(String[] args) {
+		if (args.length == 2) {
+			new GelbeSeiten(Integer.parseInt(args[0]), Integer.parseInt(args[1])).start();
+		} else {
+			new GelbeSeiten().start();
+		}
+		
+	}
+
+	@Override
+	public void run() {
+		typeOneProcessing();
+	}
+	
+	protected void typeOneProcessing() {
+		paginationURL = null;
+		detailsPageURL = null;
+		String pageHtml = null;
+		String detailsPageHtml = null;
+
+		Matcher paginationMatcher;
+
+		mainLoop: for (int i = firstPageNumber; i <= lastPageNumber; i += pageIncrement) {
+			
+			if (hasWhere) {
+				if (hasDistance) {
+					paginationURL = "http://www.gelbeseiten.de/"+what+"/"+where+",,,,,umkreis-"+distance+"/s"+i+"/relevanz/details-e-mail-kontakt";
+				} else {
+					paginationURL = "http://www.gelbeseiten.de/"+what+"/"+where+"/s"+i+"/relevanz/details-e-mail-kontakt";
+				}				
+			} else {
+				paginationURL = "http://www.gelbeseiten.de/"+what+"/s"+i+"/relevanz/details-e-mail-kontakt";
+			}
+			
+			pageHtml = getHtml(paginationURL);
+			
+		//	System.out.println(pageHtml);
+
+			if (pageHtml != null) {
+				System.out.println("-Pagination page: " + paginationURL);
+				
+				ArrayList<String> wraps = findAllInString(pageHtml, detailsWrap);
+				
+				for (String detail : wraps) {
+					write(detail);
+				}									
+				
+				paginationMatcher = paginationPattern.matcher(pageHtml);
+				if (!paginationMatcher.find()) {					
+					break;					
+				}
+				
+				sleep(requestDelay);
+			} 
+		}
+		
+		writter.close();
+		System.out.println("Program ended! Check output file");
+	}	
+	
+	@Override
+	public void write (String data) {
+		String postCode = findInString(data, postCodePattern);
+		String city = findInString(data, cityPattern);
+		
+		pProc.addData(3, postCode + " " + city);
+		pProc.processPatterns(data, writter);
+	}
+	
+}
+
+

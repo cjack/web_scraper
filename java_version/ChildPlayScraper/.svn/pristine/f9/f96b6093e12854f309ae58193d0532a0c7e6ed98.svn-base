@@ -1,0 +1,241 @@
+package bots;
+
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.FileOutputStream;
+import java.io.FileReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
+import java.lang.reflect.Array;
+import java.util.ArrayList;
+import java.util.Properties;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import org.apache.commons.httpclient.Header;
+import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.methods.GetMethod;
+import org.apache.commons.httpclient.methods.PostMethod;
+import org.apache.commons.httpclient.protocol.Protocol;
+
+import util.MailSender;
+import util.MySSLSocketFactory;
+
+public class MyRewards {
+	
+	private HttpClient client = null;
+	private GetMethod get;
+	private Pattern absoluteDollars;
+	private Pattern casinoDollars;
+	private BufferedWriter out;
+	private ArrayList<String> noviNiz;
+	private ArrayList<String> ucitaniNiz;	
+	
+	private Properties params;
+
+	public MyRewards() {
+		try {
+			params = new Properties();
+			params.load(new FileReader("params.txt"));
+			
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+		login();
+		
+	}
+
+	public static void main(String[] args) {
+		
+		new MyRewards();
+		
+	}
+	
+	private void checkForValues(String tekst) {
+		
+		ucitaniNiz = new ArrayList<String>();
+		noviNiz = new ArrayList<String>();
+		
+		Pattern absolutePoints = Pattern.compile("<div id=\"jsfwmp7257:staticCell11\" class=\"caf-cell caf-float-start\" style=\"\">(.*?)</div>");
+		Pattern absoluteDollars = Pattern.compile("<div id=\"jsfwmp7257:staticCell1112\" class=\"caf-cell caf-float-start\" style=\"\">\\$(.*?)</div>");
+		Pattern casinoDollars = Pattern.compile("<div id=\"jsfwmp7257:staticCell1311\" class=\"caf-cell caf-float-start\" style=\"\">\\$(.*?)\\(");
+		
+		Matcher m = absolutePoints.matcher(tekst);
+		
+		if(m.find()) {
+			noviNiz.add(m.group(1));
+		//	System.out.println(noviNiz[0]);
+		}
+		
+		m = absoluteDollars.matcher(tekst);
+		
+		if(m.find()) {
+			noviNiz.add(m.group(1));
+		//	System.out.println(noviNiz[1]);
+		}
+		
+		m = casinoDollars.matcher(tekst);
+		
+		if(m.find()) {
+			noviNiz.add(m.group(1));
+		//	System.out.println(noviNiz[2]);
+		}
+		
+		
+		try {
+			BufferedReader br = new BufferedReader(new FileReader("rewards.txt")); 	        
+	        String line;
+			
+	        while ((line = br.readLine()) != null) {	           
+	            ucitaniNiz.add(line);
+	        }	        
+	       
+	        for(int i = 0; i<3; i++)
+	        	System.out.println(noviNiz.get(i));
+	        
+	        //ako je doslo do promene vraca se nula, u suprotnom jedan(debilizam) :)
+	        if(matching() == 0) {
+	        	//salje se mail-ic
+	        	sendMail();
+	        	write();
+	        }
+	        
+	        
+	        
+	    } catch(IOException e) {
+	    	e.printStackTrace();
+	    }
+	    
+//	    if(noviNiz[0] != ucitannoviNiz[0]) {
+//	    	//sendMail();
+//	    	//Promena absolute points - nova vrednost se nalazi u noviNiz[0] 
+//	    }
+//	    
+//	    if(noviNiz[1] != ucitannoviNiz[1]) {
+//	    	//sendMail();
+//	    	//Promena absolute dollars - nova vrednost se nalazi u noviNiz[1] 
+//	    }
+//	    
+//	    if(noviNiz[2] != ucitannoviNiz[2]) {
+//	    	if(noviNiz[1] != ucitannoviNiz[1]) {
+//		    	//sendMail();
+//		    	//Promena casino dollars - nova vrednost se nalazi u noviNiz[2] 
+//		    }
+//	    }
+	
+	}
+	
+	private void sendMail() {
+		float diff1 = Float.parseFloat(noviNiz.get(0)) - Float.parseFloat(ucitaniNiz.get(0));
+		float diff2 = Float.parseFloat(noviNiz.get(1)) - Float.parseFloat(ucitaniNiz.get(1));
+		float diff3 = Float.parseFloat(noviNiz.get(2)) - Float.parseFloat(ucitaniNiz.get(2));
+		
+		StringBuilder message = new StringBuilder();
+		message.append("ABSOLUTE POINTS: " + ucitaniNiz.get(0)).append(" -> ").append(noviNiz.get(0)).append(" (" + (diff1>=0?"+":"-") + diff1 + ")").append("\n");
+		message.append("ABSOLUTE DOLLARS: " + ucitaniNiz.get(1)).append(" -> ").append(noviNiz.get(1)).append(" (" + (diff2>=0?"+":"-") + diff2 + ")").append("\n");
+		message.append("CASINO DOLLARS: " + ucitaniNiz.get(2)).append(" -> ").append(noviNiz.get(2)).append(" (" + (diff3>=0?"+":"-") + diff3 + ")").append("\n");
+		
+		
+		MailSender.getInstance(params).sendMail("Changes happened on your account at absoluterewards", message.toString(), params);
+	}
+
+	private void write() {
+		
+		try {
+			out = new BufferedWriter(new OutputStreamWriter(new FileOutputStream("rewards.txt"), "UTF-8"));
+			//out.newLine();
+			for(int i = 0; i < 3; i++) {
+				out.write(noviNiz.get(i));	
+				out.newLine();
+			}
+			
+			out.flush();
+			
+			out.close();
+			
+		}catch(Exception e) {
+			e.printStackTrace();
+		}
+	}
+	
+	private int matching() {
+		
+		for(int i=0; i<3; i++) {
+			if(!noviNiz.get(i).equals(ucitaniNiz.get(i))) {
+				return 0;
+			}
+		}
+		
+		return 1;
+	}
+	
+	private void login() {
+		try {
+			//Protocol.registerProtocol("https", new Protocol("https", new MySSLSocketFactory(), 443));
+			
+			client  = new HttpClient();
+			
+			
+			//GetMethod get = new GetMethod("https://www.sambro.co.uk/customer/account/login/");
+			
+			//get.setRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:29.0) Gecko/20100101 Firefox/29.0");
+			//client.executeMethod(get);
+			
+			
+			PostMethod post = new PostMethod("https://www.absoluterewards.com.au/colt/absoluterewards/myrewards");
+			post.setParameter("username", params.getProperty("username"));
+			post.setParameter("password", params.getProperty("password"));
+			
+			
+			client.executeMethod(post);		
+			
+//			for (Header h : post.getResponseHeaders()) {
+//				System.out.println(h.getName() + " - " + h.getValue());
+//			}
+			
+			get = new GetMethod("https://www.absoluterewards.com.au/meta/default/coltabsoluterewards___myrewards/0000007257?wmp_tc=7257&wmp_rt=render&wmp_tv=%2fMyRewards%2fhome.view&__ns=wmp7257");
+			client.executeMethod(get);
+			
+			StringBuilder sb = new StringBuilder();
+			BufferedReader in = new BufferedReader(new InputStreamReader(get.getResponseBodyAsStream()));
+			String line = null;
+			
+			while ((line = in.readLine()) != null) {
+				sb.append(line);
+				sb.append("\n");
+			}
+			
+			in.close();
+			
+			checkForValues(sb.toString());
+			
+		//	System.out.println(sb.toString());
+			
+		//	get = new GetMethod("https://www.sambro.co.uk/customer/account/");
+		//	client.executeMethod(get);
+			
+		//	StringBuilder sb = new StringBuilder();
+		//	BufferedReader in = new BufferedReader(new InputStreamReader(get.getResponseBodyAsStream()));
+		//	String line = null;
+			
+		//	while ((line = in.readLine()) != null) {
+		//		sb.append(line);
+		//	}
+			
+		//	in.close();
+			
+			//categories = new ArrayList<String>();
+			//categories = findAllInString(sb.toString(), Pattern.compile("<a href=\"(http://www.sambro.co.uk/categories/[\\w|-]+/[^/]+html)\""));
+			
+		//	System.exit(0);
+			
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+		
+	}
+
+}

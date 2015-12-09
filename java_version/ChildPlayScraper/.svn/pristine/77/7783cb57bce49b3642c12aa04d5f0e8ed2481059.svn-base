@@ -1,0 +1,269 @@
+package bots;
+
+import master.Master;
+import util.*;
+
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.*;
+
+import org.apache.commons.httpclient.Header;
+import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.methods.GetMethod;
+import org.apache.commons.httpclient.methods.PostMethod;
+
+public class Iaccess extends Master {
+
+	public Iaccess(Integer firstPage, Integer lastPage) {		
+		this();
+		firstPageNumber = firstPage;
+		lastPageNumber = lastPage;
+	}
+	
+	public Iaccess() {		
+		paginationPattern = Pattern.compile(">Next</a>");
+		
+		pProc = new PatternProcessor();
+		writter = new Writter("output1.csv");
+		
+		pProc.addPattern(1, Pattern.compile("<b>Name of Program:.+?columnClass1\">\\s*(.+?)\\s*</", Pattern.DOTALL));
+		pProc.addReplacement(1, "<.+?>", "");
+		pProc.addPattern(2, Pattern.compile("Type of Program:</span></a>.+?columnClass1\">(.+?)\\s*<", Pattern.DOTALL));
+		pProc.addPattern(3, Pattern.compile("<b>Name of Operator:.+?columnClass1\">(.+?)\\s*<", Pattern.DOTALL));
+		pProc.addPattern(4, Pattern.compile("<b>Address:.+?columnClass1\">(.+?)\\s*</td>", Pattern.DOTALL));
+		pProc.addReplacement(4, "<br />", "");
+		pProc.addReplacement(4, "\\s+", " ");
+		pProc.addPattern(5, Pattern.compile("<b>Phone:.+?columnClass1\">(.+?)\\s*<", Pattern.DOTALL));
+		pProc.addPattern(6, Pattern.compile("<b>Website:.+?columnClass1\">(.+?)\\s*<", Pattern.DOTALL));
+		pProc.addReplacement(6, "<.+?>", "");
+		pProc.addPattern(7, Pattern.compile("<b>Date of First Licence:.+?columnClass1\">(.+?)\\s*<", Pattern.DOTALL));
+		pProc.addPattern(8, Pattern.compile("Licensed Capacity by Age Group:</span></a>.+?columnClass1\"><div>(.+?)\\s*<", Pattern.DOTALL));
+		pProc.addPattern(9, Pattern.compile("Total Licensed Capacity:</span></a>.+?columnClass1\">(.+?)\\s*<", Pattern.DOTALL));
+		pProc.addPattern(10, Pattern.compile("Licence Status:</span></a>.+?columnClass1\">(.+?)\\s*<", Pattern.DOTALL));
+	}	
+
+	public static void main(String[] args) {
+		if (args.length == 2) {
+			new Iaccess(Integer.parseInt(args[0]), Integer.parseInt(args[1])).start();
+		} else {
+			new Iaccess().start();
+		}
+		
+	}
+	
+	ArrayList<String> cookies = new ArrayList<String>();
+	String viewState = "";
+	private Pattern detailsPagePattern = Pattern.compile("'enterAppForm','(enterAppForm:programList:.+?)'");
+
+	@Override
+	public void run() {
+		String html = fetchPageContent("http://www.iaccess.gov.on.ca/LCCWWeb/childcare/search.xhtml");
+		
+		viewState = findInString(html, Pattern.compile("id=\"javax.faces.ViewState\" value=\"(.+?)\""));
+		
+		PostMethod post = new PostMethod("http://www.iaccess.gov.on.ca/LCCWWeb/childcare/search.xhtml");
+		
+		post.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+		post.setRequestHeader("Content-Length", "389");
+		post.setRequestHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+		post.setRequestHeader("Accept-Encoding", "gzip, deflate");
+		post.setRequestHeader("Accept-Language", "sr,sr-RS;q=0.8,sr-CS;q=0.6,en-US;q=0.4,en;q=0.2");
+		post.setRequestHeader("Connection", "keep-alive");
+		post.setRequestHeader("Host", "www.iaccess.gov.on.ca");
+		post.setRequestHeader("Referer", "http://www.iaccess.gov.on.ca/LCCWWeb/childcare/search.xhtml");
+		post.setRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:36.0) Gecko/20100101 Firefox/36.0");
+		
+		
+		StringBuilder cookieString = new StringBuilder();
+		for (String cookie : cookies) {
+			cookieString.append(cookie.substring(0, cookie.indexOf(";") + 1));
+		}
+		
+		post.setRequestHeader("Cookie", cookieString.toString());
+		
+		post.setParameter("enterAppForm:global", "");
+		post.setParameter("enterAppForm:j_id194", "CCCB");
+		post.setParameter("enterAppForm:j_id213", "2");
+		post.setParameter("enterAppForm:j_id221", "");
+		post.setParameter("enterAppForm:j_id227", "");
+		post.setParameter("enterAppForm:j_id239", "SEARCH");
+		post.setParameter("enterAppForm:postalCode", "");
+		post.setParameter("enterAppForm_SUBMIT", "1");
+		post.setParameter("javax.faces.ViewState", viewState);
+		
+		try {
+			httpClient.executeMethod(post);
+			
+			GetMethod get = new GetMethod("http://www.iaccess.gov.on.ca/LCCWWeb/childcare/searchResults.xhtml");
+			
+			get.setRequestHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+			get.setRequestHeader("Accept-Encoding", "gzip, deflate");
+			get.setRequestHeader("Accept-Language", "sr,sr-RS;q=0.8,sr-CS;q=0.6,en-US;q=0.4,en;q=0.2");
+			get.setRequestHeader("Connection", "keep-alive");
+			get.setRequestHeader("Host", "www.iaccess.gov.on.ca");
+			get.setRequestHeader("Referer", "http://www.iaccess.gov.on.ca/LCCWWeb/childcare/search.xhtml");
+			get.setRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:36.0) Gecko/20100101 Firefox/36.0");			
+			
+			get.setRequestHeader("Cookie", cookieString.toString());
+			
+			httpClient.executeMethod(get);
+			
+		//	processPaginationPage(getDataFromStream(get.getResponseBodyAsStream(), false));
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+		firstPageNumber = 68;
+		pageIncrement = 1;
+		pageNumberParam = "enterAppForm:targetPageIndex";
+		postPageURL = "http://www.iaccess.gov.on.ca/LCCWWeb/childcare/searchResults.xhtml";
+		
+		postMethodParams = new HashMap<String, String>();
+		postMethodParams.put("enterAppForm:_idcl", "enterAppForm:gotoPage");
+		postMethodParams.put("enterAppForm:currentPageIndex", "68");
+		postMethodParams.put("enterAppForm:sortBy", "");
+		postMethodParams.put("enterAppForm_SUBMIT", "1");	
+		postMethodParams.put("javax.faces.ViewState", viewState);	
+		
+		postMethodProcessing();
+	}
+	
+	private void processPaginationPage(String pageHtml) {
+		System.out.println("Page " + pageNum);
+		viewState = findInString(pageHtml, Pattern.compile("id=\"javax.faces.ViewState\" value=\"(.+?)\""));
+		
+		ArrayList<String> codes = findAllInString(pageHtml, detailsPagePattern);
+		
+		for (String code : codes) {
+			PostMethod post = new PostMethod("http://www.iaccess.gov.on.ca/LCCWWeb/childcare/searchResults.xhtml");
+			
+			post.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+			post.setRequestHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+			post.setRequestHeader("Accept-Encoding", "gzip, deflate");
+			post.setRequestHeader("Accept-Language", "sr,sr-RS;q=0.8,sr-CS;q=0.6,en-US;q=0.4,en;q=0.2");
+			post.setRequestHeader("Connection", "keep-alive");
+			post.setRequestHeader("Host", "www.iaccess.gov.on.ca");
+			post.setRequestHeader("Referer", "http://www.iaccess.gov.on.ca/LCCWWeb/childcare/searchResults.xhtml");
+			post.setRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:36.0) Gecko/20100101 Firefox/36.0");			
+			
+			StringBuilder cookieString = new StringBuilder();
+			for (String cookie : cookies) {
+				cookieString.append(cookie.substring(0, cookie.indexOf(";") + 1));
+			}
+			
+			post.setRequestHeader("Cookie", cookieString.toString());
+			
+			post.setParameter("enterAppForm:_idcl", code);
+			post.setParameter("enterAppForm:currentPageIndex", Integer.toString(pageNum));
+			post.setParameter("enterAppForm:sortBy", "");
+			post.setParameter("enterAppForm:targetPageIndex", Integer.toString(pageNum));
+			post.setParameter("enterAppForm_SUBMIT", "1");
+			post.setParameter("javax.faces.ViewState", viewState);
+			
+			try {
+				httpClient.executeMethod(post);
+				
+				GetMethod get = new GetMethod("http://www.iaccess.gov.on.ca/LCCWWeb/childcare/searchResultsDetail.xhtml");
+				
+				get.setRequestHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+				get.setRequestHeader("Accept-Encoding", "gzip, deflate");
+				get.setRequestHeader("Accept-Language", "sr,sr-RS;q=0.8,sr-CS;q=0.6,en-US;q=0.4,en;q=0.2");
+				get.setRequestHeader("Connection", "keep-alive");
+				get.setRequestHeader("Host", "www.iaccess.gov.on.ca");
+				get.setRequestHeader("Referer", "http://www.iaccess.gov.on.ca/LCCWWeb/childcare/search.xhtml");
+				get.setRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:36.0) Gecko/20100101 Firefox/36.0");			
+				
+				get.setRequestHeader("Cookie", cookieString.toString());
+				
+				httpClient.executeMethod(get);
+				
+				System.out.println("\tProcessing code: " + code);
+				
+				write(getDataFromStream(get.getResponseBodyAsStream(), false));
+			} catch (Exception e) {
+				// TODO: handle exception
+			}
+			
+			
+		}
+		
+	}
+
+	public String fetchPageContent(String fromPage) {
+		try {
+			if (httpClient == null) {
+				httpClient = new HttpClient();
+			}
+			
+			GetMethod get = new GetMethod(fromPage);
+			httpClient.executeMethod(get);
+			
+			for (Header h : get.getResponseHeaders()) {
+				if (h.getName().contains("Cookie")) {
+					cookies.add(h.getValue());
+				}
+			}
+			
+			StringBuilder sb = new StringBuilder();
+			String line;
+			BufferedReader in = new BufferedReader(new InputStreamReader(get.getResponseBodyAsStream()));
+			while ((line = in.readLine()) != null) {
+				sb.append(line).append("\n");
+			}
+			
+			in.close();
+			get.releaseConnection();
+			
+			return sb.toString();			
+		} catch (Exception e) {
+			System.err.println("#### GREŠKA ZA: " + fromPage + " ####");
+			e.printStackTrace();			
+			return null;
+		}
+	}
+	
+	int pageNum = 68;
+	
+	protected void postMethodProcessing() {
+		paginationURL = null;
+		detailsPageURL = null;
+		String pageHtml = null;
+		String carHtml = null;
+		String carURLHash = null;
+		long carID;
+		int errorDelay = initialErrorDelay;
+
+		Matcher paginationMatcher;
+		Matcher urlMatcher;
+		HashSet<String> carURLs;
+
+		mainLoop: for (pageNum = firstPageNumber; pageNum <= lastPageNumber; pageNum += pageIncrement) {
+			postMethodParams.put(pageNumberParam, pageNumberValuePartOne + pageNum + pageNumberValuePartTwo);
+			pageHtml = getHtmlByPost();
+			
+			if (pageHtml != null) {
+				processPaginationPage(pageHtml);
+					
+				sleep(requestDelay);
+				
+				paginationMatcher = paginationPattern.matcher(pageHtml);
+				if (!paginationMatcher.find()) {
+					break;
+				}
+			} 
+		}
+	}
+	
+	@Override
+	public void write (String data) {
+	//	System.out.println(data);
+		
+		pProc.processPatterns(data, writter);
+		
+	}
+	
+}
+
+

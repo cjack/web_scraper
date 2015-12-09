@@ -1,0 +1,99 @@
+package bots.australia_jarris;
+
+import master.Master;
+import util.*;
+
+import java.io.FileReader;
+import java.text.SimpleDateFormat;
+import java.util.regex.Pattern;
+import java.util.*;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import com.sun.jndi.url.corbaname.corbanameURLContextFactory;
+
+public class Courts_VIC extends Master {
+	
+	private String date;
+	
+	public Courts_VIC() {		
+		writter = new Writter("courts_vic.csv");
+		
+		pProc = new PatternProcessor();
+		
+		Properties p = new Properties();
+		try {
+			p.load(new FileReader("properties/properties.txt"));
+			date = p.getProperty("date");
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}	
+
+	public static void main(String[] args) {
+		new Courts_VIC().start();		
+	}
+
+	@Override
+	public void run() {
+		String json = fetchPageContent("http://dailylists.courts.vic.gov.au/scripts/proxy.php?url=http%3A%2F%2Fdailylists.courtnexus.com%2FDailyListService.svc%2FSearchCases%3FcourtIds%3D3%2C4%2C2%26divisionIds%3D2%26dateFromString%3D"+date+"T000000%26dateToString%3D"+date+"T235959%26maxResults%3D1000%26random%3D1438330793014");
+		if (json.contains("\"contents\":\"[]\"}")) {
+			System.out.println("There are no results for this date!");
+			return;
+		}
+		
+		try {
+			JSONObject obj = new JSONObject(json);
+			JSONArray array = obj.getJSONArray("contents");
+			
+			for(int i = 0; i < array.length(); i++)
+			{
+			      JSONObject object = array.getJSONObject(i);
+
+			      pProc.addData(1, "VIC");
+			      pProc.addData(7, object.getString("FullCaseName"));
+			      
+			      String date = object.getString("SCaseDateTime");
+			      date = date.substring(0, date.indexOf(" ")).replace("-", "/");
+			      pProc.addData(2, "'" + date);
+			      
+			      String caseID = object.getString("CaseID");
+			      pProc.addData(8, caseID);
+			      pProc.addData(9, object.getString("JudicialOfficer"));
+			      pProc.addData(3, object.getString("Description"));
+			      
+			      String courtName = "";
+			      String location = "";
+			      if (caseID.startsWith("AP-") || caseID.startsWith("CR-")) {
+			    	  courtName = "County Court of Victoria";
+			    	  location = "250 William Street, MELBOURNE";
+			      } else if (caseID.startsWith("S APCR")) {
+			    	  courtName = "Court of Appeal";
+			    	  location = "459 Lonsdale Street, MELBOURNE";
+			      } else if (caseID.startsWith("S CR")) {
+			    	  courtName = "Supreme Court of Victoria";
+			    	  location = "210 William Street MELBOURNE";
+			      } else {
+			    	  System.err.println("What is this " + caseID);
+			      }
+			      pProc.addData(4, courtName);
+			      pProc.addData(5, location);
+			      pProc.addData(6, object.getString("SiteRoom"));
+			      
+			      pProc.processPatterns("", writter);
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+	}
+	
+	@Override
+	public void write (String data) {
+		
+	}
+	
+}
+
+

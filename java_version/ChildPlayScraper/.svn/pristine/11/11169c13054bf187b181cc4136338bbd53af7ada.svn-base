@@ -1,0 +1,24 @@
+package main;
+
+import java.io.File;
+import java.util.ArrayList;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import util.Files;
+import util.Writter;
+
+public class Convertor {
+
+	public static void main(String[] args) {
+		
+		String data = Files.loadFileData("input.txt");
+		
+		Pattern p = Pattern.compile("<dt>الوصف</dt>.+?<dd>\\s+(.+?)\\s+</dd>", Pattern.DOTALL);
+		Matcher m = p.matcher(data);
+		while (m.find()) {
+			System.out.println(m.group(1));
+		}
+		
+	}
+}

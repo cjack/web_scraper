@@ -1,0 +1,75 @@
+package bots;
+
+import java.awt.Color;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.util.ArrayList;
+
+import javax.swing.JButton;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JTextField;
+
+public class MyActionListener implements ActionListener {
+	
+	private ArrayList<Game> gamesBeingMonitored;
+	private int index;
+	private JPanel panel;
+	private JLabel label;
+	private JButton button;
+	private JTextField text;
+	
+	public MyActionListener(ArrayList<Game> games, int index, JPanel panel, JLabel label, JButton button, JTextField text) {
+		super();
+		this.gamesBeingMonitored = games;
+		this.index = index;
+		this.panel = panel;
+		this.label = label;
+		this.button = button;
+		this.text = text;
+	}
+	
+	@Override
+	public void actionPerformed(ActionEvent e) {
+		this.gamesBeingMonitored.remove(index);
+		panel.removeAll();
+		for (int i = 0; i < gamesBeingMonitored.size(); i++) {
+			Game g = gamesBeingMonitored.get(i);
+			JLabel label = new JLabel(g.getName() + " " + g.getType() + " " + g.getValue() + "   last check = " + g.getLastCheck());
+			label.setSize(270, 25);
+			label.setLocation(10, 10 + i * 30);
+			label.setOpaque(true);
+			
+			JTextField text = new JTextField(g.getNote());
+			text.setSize(100, 25);
+			text.setLocation(300, 10 + i * 30);
+			text.addKeyListener(new MyKeyListener(text, g));
+			
+			JButton delButton =  new JButton("delete");
+			delButton.setSize(100, 20);
+			delButton.setLocation(420, 12 + i * 30);
+			
+			if (g.getLastCheck() != -1) {
+				
+				if (g.getType().equals("<=")) {
+					if (g.getLastCheck() <= g.getValue()) {						
+						label.setBackground(Color.RED);						
+					}
+				} else {
+					if (g.getLastCheck() >= g.getValue()) {						
+						label.setBackground(Color.RED);						
+					}
+				}
+			}
+			
+			delButton.addActionListener(new MyActionListener(gamesBeingMonitored, i, panel, label, delButton, text));			
+			
+			panel.add(text);
+			panel.add(label);
+			panel.add(delButton);
+			
+		}
+		panel.repaint();
+	}
+
+}

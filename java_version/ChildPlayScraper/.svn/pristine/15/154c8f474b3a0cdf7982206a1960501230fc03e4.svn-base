@@ -1,0 +1,57 @@
+package bots;
+
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.util.ArrayList;
+import java.util.regex.Pattern;
+
+import master.Master;
+import util.*;
+
+public class BigData extends Master {
+
+	private Pattern pattern;
+
+	public BigData() {		
+	//	pProc = new PatternProcessor();
+		writter = new Writter("links.txt");
+		
+		pattern = Pattern.compile("\"url\":\"(.*?)\"");
+				
+	}		
+
+	public static void main(String[] args) {		
+		new BigData().start();
+	}
+
+	@Override
+	public void run() {				
+		try {
+			BufferedReader in = new BufferedReader(new FileReader("C:\\Users\\Dusan\\Desktop\\input.json.003"));
+			String line = null;
+			
+			while ((line = in.readLine()) != null) {								
+				ArrayList<String> urls = findAllInString(line, pattern);
+				
+				for (String url : urls) {
+					if (url.equals(""))continue;
+					writter.writeLine(url);
+				}
+			}
+			
+			in.close();		
+			writter.close();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+	}
+	
+	@Override
+	public void write (String data) {
+	//	pProc.processPatterns(data, writter);
+	}
+	
+}
+
+

@@ -1,0 +1,158 @@
+package bots;
+
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import util.Sha1Hash;
+
+import master.Master;
+
+public class MrtviLjudi2 extends Master{
+	
+	ArrayList<ArrayList<Pattern>> sitePatterns = new ArrayList<ArrayList<Pattern>>();
+	
+	// dignity site patterns
+//	private Pattern dignitySiteValidation = Pattern.compile("Dignity Memorial");
+//	private Pattern dignityNameP = Pattern.compile("<h1 class=\"name_of_deceased\">(.+?)</h1>");
+//	private Pattern dignityDDateP = Pattern.compile("<div class=\"dates\">(.+?)</div>");
+//	private Pattern dignityTextP = Pattern.compile("class=\"full\">(.+?)</div>", Pattern.DOTALL);
+//	private Pattern dignityPublishP = Pattern.compile("'Obit Publish Date: (.+?)',");
+	
+	//legacy site pattern	
+	private Pattern legacySiteValidation = Pattern.compile("<span itemprop=\"givenName\">");
+	private Pattern legacyNameP = Pattern.compile("<span itemprop=\"name\">(.+?)</span></span>");
+//	private Pattern dignityDDateP = Pattern.compile("<div class=\"dates\">(.+?)</div>");
+	private Pattern legacyTextP = Pattern.compile("class=\"ObitTextHtml\".+?>(.+?)</span>", Pattern.DOTALL);
+	private Pattern legacyPublishP = Pattern.compile("'Obit Publish Date: (.+?)',");
+	
+	//meaningfulfunerals site pattern
+	private Pattern meaningfulSiteValidation = Pattern.compile("<base href=\"www.meaningfulfunerals.net\">");
+
+	
+	
+	
+	
+	
+	private RelationsExtractor relationsExtractor;
+
+
+	public MrtviLjudi2() {
+		
+		paginationPattern = Pattern.compile("<a .+?_uxNextLink\"\\s+class=\"next\"");
+		detailsPagePattern = Pattern.compile("<div class=\"obitName\">\\s+<a.+?href=\"(.+?)\"", Pattern.DOTALL);
+		
+		relationsExtractor = new RelationsExtractor();
+		
+		
+		addNewPatternSet(Pattern.compile("<span itemprop=\"givenName\">"), Pattern.compile("<span itemprop=\"name\">(.+?)</span></span>"), null, Pattern.compile("class=\"ObitTextHtml\".+?>(.+?)</span>", Pattern.DOTALL), null);
+		addNewPatternSet(Pattern.compile("<base href=\"www.meaningfulfunerals.net\">"), Pattern.compile("<span class=\"obitname\">\\s+<strong>(.+?)<"), Pattern.compile("<span class=\"obitlink\">.+?-\\s+(.+?)\\)"), Pattern.compile("<div class=\"content\" style=\"padding-right: 10px;\">(.+?)</div>", Pattern.DOTALL), null);
+		addNewPatternSet(Pattern.compile("Hillview Memorial Gardens"), Pattern.compile("<h2>(.+?)</h2>"), Pattern.compile("-\\s+((\\w+)\\s+\\d+,\\s*\\d{4})"), Pattern.compile("<td colspan=\"2\">.+?</tr>.+?<td colspan=\"2\">(.+?)</td>", Pattern.DOTALL), null);
+	}
+	
+	private void addNewPatternSet(Pattern pattern1, Pattern pattern2, Pattern pattern3, Pattern pattern4, Pattern pattern5) {
+		ArrayList<Pattern> pats = new ArrayList<>();
+		pats.add(pattern1);
+		pats.add(pattern2);
+		pats.add(pattern3);
+		pats.add(pattern4);
+		pats.add(pattern5);
+		
+		sitePatterns.add(pats);
+		
+	}
+
+	protected void typeOneProcessing() {
+		paginationURL = null;
+		detailsPageURL = null;
+		String pageHtml = null;
+		String detailsPageHtml = null;
+		String carURLHash = null;
+
+		Matcher paginationMatcher;
+		Matcher urlMatcher;
+		HashSet<String> carURLs;
+
+		mainLoop: for (int i = firstPageNumber; i <= lastPageNumber; i += pageIncrement) {
+			paginationURL = incrementPartOneURL + formParam + formValue + pageNumberParam + i + incrementPartTwoURL;
+			pageHtml = getHtml(paginationURL);
+			
+
+			if (pageHtml != null) {
+				System.out.println("-Pagination page: " + paginationURL);
+
+				urlMatcher = detailsPagePattern.matcher(pageHtml);
+				carURLs = new HashSet<String>();
+				while (urlMatcher.find()) {
+					detailsPageURL = urlMatcher.group(1);
+					detailsPageURL = detailsPageURL.replace("&amp;", "&");
+					
+					if (!detailsPageURL.startsWith("http:")) {
+						detailsPageURL = baseURL + detailsPageURL;
+					}
+
+					System.out.println("\t"+ detailsPageURL);
+					carURLHash = Sha1Hash.SHA1(detailsPageURL);
+
+					if (carURLs.contains(carURLHash)) {
+						continue;
+					} else {
+						carURLs.add(carURLHash);
+					}
+
+					detailsPageHtml = getHtml(detailsPageURL);
+				//	System.out.println(detailsPageHtml);
+
+					if (detailsPageHtml != null) {
+						write(detailsPageHtml);
+						recordCount++;
+						newRecordsCount++;
+					}
+					
+					sleep(requestDelay);
+				}
+				paginationMatcher = paginationPattern.matcher(pageHtml);
+				if (!paginationMatcher.find()) {					
+					break;					
+				}
+			} 
+		}
+	}
+	
+	public void run() {
+		
+		firstPageNumber = 1;
+		pageIncrement = 1;
+		
+		incrementPartOneURL = "http://www.legacy.com/ns/obitfinder/obituary-search.aspx?Page=";
+		incrementPartTwoURL ="&daterange=Last24Hrs&countryid=1";
+		
+		typeOneProcessing();
+		
+	}
+	
+	public void write(String data) {
+		
+		for (ArrayList<Pattern> sitePattern : sitePatterns) {
+			Matcher m = sitePattern.get(0).matcher(data);
+			if (m.find()) {					
+				
+				String text = findInString(data, sitePattern.get(3));
+				ArrayList<String> relations = relationsExtractor.extractRelations(text);
+				
+				for (String relation : relations) {
+					System.out.println(relation);
+				}
+				return;
+			}
+		}
+		
+		System.err.println("Not found " + detailsPageURL);
+	}
+	
+	public static void main(String[] args) {
+		new MrtviLjudi2().run();
+	}
+
+}

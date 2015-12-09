@@ -1,0 +1,164 @@
+package bots;
+
+import java.net.URLDecoder;
+import java.net.URLEncoder;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import master.Master;
+import util.*;
+
+public class Canada441byZip extends Master {
+
+	private Pattern wrapPattern;
+
+	public Canada441byZip() {		
+		writter = new Writter("output.csv");
+		writter.writeLine("\"Title\",\"Address\",\"Phone\"");
+		pProc = new PatternProcessor();
+		
+		pageIncrement = 1;
+	//	lastPageNumber = 17750;
+		
+		requestDelay = 2000;
+		firefoxMask = true;
+		
+		paginationPattern = Pattern.compile("<li class=\"pagingNext\">");
+		
+		wrapPattern = Pattern.compile("class=\"listingDetail\">(.+?)</div>", Pattern.DOTALL);
+		
+		pProc.addPattern(1, Pattern.compile("href.+?>(.+?)</a>", Pattern.DOTALL));
+		pProc.addPattern(2, Pattern.compile("class=\"adr\"\\s+.+?>(.+?)<"));
+		pProc.addPattern(3, Pattern.compile("c411Phone.+?>(.+?)<"));
+	}		
+
+	public static void main(String[] args) {		
+		new Canada441byZip().start();
+	}
+
+	@Override
+	public void run() {
+		ArrayList<String> urls = Files.loadListFromFile("canada411codes.txt");
+		
+		for (String url : urls) {
+			if (url.trim().equals("")) continue;
+			
+			System.out.println("NEXT URL STARTING");
+			
+			if (url.contains("stype=si")) { // different type url
+				
+				String what = url.substring(url.indexOf("where=")+6);
+				what = URLDecoder.decode(what).replace(",", "");
+				
+				incrementPartOneURL = "http://www.canada411.ca/search/si/";
+				incrementPartTwoURL = "/-/" + URLEncoder.encode(what) + "/";
+//				String pageHtml = getHtml(url);				
+//				
+//				if (pageHtml != null) {
+//					System.out.println("-Pagination page: " + url);
+//										
+//					ArrayList<String> ads = findAllInString(pageHtml, wrapPattern);
+//												
+//					for (String adText : ads) {
+//											
+//						write(adText);
+//						recordCount++;					
+//						
+//					}
+//				}
+//				continue;
+			} else {
+						
+				incrementPartOneURL = url.substring(0, url.indexOf("/1/")+1);
+				incrementPartTwoURL = url.substring(url.indexOf("/1/")+2);
+			}
+			
+			firstPageNumber = 1;
+			
+			typeOneProcessing();
+			
+			sleep(2000);
+		}
+		
+		System.out.println("FINISHED");
+	}
+	
+	protected void typeOneProcessing() {
+		paginationURL = null;
+		detailsPageURL = null;
+		String pageHtml = null;
+		int errorDelay = initialErrorDelay;
+
+		Matcher paginationMatcher;		
+		
+		mainLoop: for (int i = firstPageNumber; i <= lastPageNumber; i += pageIncrement) {
+			paginationURL = incrementPartOneURL + formParam + formValue + pageNumberParam + i + incrementPartTwoURL;
+			pageHtml = getHtml(paginationURL);
+			
+		//	System.out.println(pageHtml);
+
+			
+			if (pageHtml != null) {
+				System.out.println("-Pagination page: " + paginationURL);
+				errorCount = 0;
+				errorDelay = initialErrorDelay;
+				
+				ArrayList<String> ads = findAllInString(pageHtml, wrapPattern);
+						
+				
+				for (String adText : ads) {
+										
+					write(adText);
+					recordCount++;					
+					
+				}
+				paginationMatcher = paginationPattern.matcher(pageHtml);
+				if (!paginationMatcher.find()) {
+					if (paginationCheckTime != 0) {
+					//	System.out.println("Last pagination check for " + webSiteID + " in progress ...");
+						sleep(paginationCheckTime);
+
+						pageHtml = getHtml(paginationURL);
+						if (pageHtml == null) {
+							break;
+						}
+
+						paginationMatcher = paginationPattern.matcher(pageHtml);
+						if (!paginationMatcher.find()) {
+							break;
+						} else {
+							i -= pageIncrement;
+						}
+					} else {
+						break;
+					}
+				}
+				
+				sleep(requestDelay);
+			} else {
+				errorCount++;
+				if (errorCount == 5) {
+					break;
+				}
+				i -= pageIncrement;
+				
+				sleep(errorDelay);
+				errorDelay *= 1;				
+			}
+			if (stopped) {
+				break;
+			}
+		}
+	}
+	
+	@Override
+	public void write (String data) {
+		
+		pProc.processPatterns(data, writter);
+	}
+	
+}
+
+

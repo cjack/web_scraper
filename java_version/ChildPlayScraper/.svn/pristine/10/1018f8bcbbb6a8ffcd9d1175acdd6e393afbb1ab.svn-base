@@ -1,0 +1,212 @@
+package bots.australia_jarris;
+
+import master.Master;
+import util.*;
+
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.zip.GZIPInputStream;
+import java.util.*;
+
+import javax.swing.JTextArea;
+
+import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.HttpStatus;
+import org.apache.commons.httpclient.methods.PostMethod;
+
+public class MagistratesvicGUI extends Master {
+
+	private String date = "";
+	
+	Pattern divWrap = Pattern.compile("<div class=\"searchCasesResult\">(.+?)</div>", Pattern.DOTALL);
+	Pattern trWrap = Pattern.compile("<tr>(.+?)</tr>", Pattern.DOTALL);
+	Pattern tdPattern = Pattern.compile("<td>\\s*(.*?)\\s*</td>", Pattern.DOTALL);
+	
+	private JTextArea textArea;
+	private StartClassGUI mainClassInstance;
+	
+	public MagistratesvicGUI(String date, JTextArea textArea, StartClassGUI mainClassInstance) {		
+		this.date = date;
+		this.textArea = textArea;
+		this.mainClassInstance = mainClassInstance;
+		
+		firstPageNumber = 1;
+		pageIncrement = 1;
+		paginationPattern = Pattern.compile("<span class=\"nextPage\">Next</span>");
+		
+		writter = new Writter("magistratesvic_out_"+date.replace("/", "_")+".csv");
+		writter.writeLine("Case ID,Informant / Applicant,Defendant/Accused/Respondent,Location,Hearing Date,Informant Station,Prosecuting Agency");
+		
+		pProc = new PatternProcessor();
+		pProc.addReplacement(1, "<.+?>", "");
+		
+	}	
+
+	public static void main(String[] args) {		
+	//	new MagistratesvicGUI("woods").start();		
+	}
+
+	@Override
+	public void run() {
+		String pageHtml = fetchPageContent("https://dailylists.magistratesvic.com.au/search-court-lists.aspx?");
+		
+		String viewstate = findInString(pageHtml, Pattern.compile("id=\"__VIEWSTATE\" value=\"(.+?)\""));		
+		
+		pageNumberParam = "__EVENTTARGET";
+		pageNumberValuePartOne = "ctl00$ctl00$ctl00$ContentPlaceHolderDefault$master_mainContentPlaceHolder$ctl00$PublicUserSearchCasesControl_6$dpCases$ctl01$ctl00";							      
+		
+		postPageURL = "https://dailylists.magistratesvic.com.au/search-court-lists.aspx?";
+		postMethodParams = new HashMap<String, String>();
+		
+		ArrayList<String> params = Files.loadListFromFile("properties/magistratesvic_props.txt");
+		for (String param : params) {
+			String parts [] = param.split("=");
+			
+			if (parts.length == 2) {
+				postMethodParams.put(parts[0], parts[1]);
+			} else {
+				postMethodParams.put(parts[0], "");
+			}
+			
+		}
+
+		postMethodParams.put("__VIEWSTATE", viewstate);
+		postMethodParams.put("ctl00$ctl00$ctl00$ContentPlaceHolderDefault$master_mainContentPlaceHolder$ctl00$PublicUserSearchCasesControl_6$txtDefendantRespondant", this.date);
+				
+		pageHtml = getHtmlByPost();
+	//	System.out.println(pageHtml);
+		
+		viewstate = findInString(pageHtml, Pattern.compile("id=\"__VIEWSTATE\" value=\"(.+?)\""));	
+		
+		postMethodParams.clear();
+		
+		postMethodParams.put("__VIEWSTATE", viewstate);
+		postMethodParams.put("ctl00$ctl00$ctl00$ContentPlaceHolderDefault$master_mainContentPlaceHolder$ctl00$PublicUserSearchCasesControl_6$hdnDefendantRespondant", this.date);
+		postMethodParams.put("ctl00$ctl00$ctl00$ContentPlaceHolderDefault$master_mainContentPlaceHolder$ctl00$PublicUserSearchCasesControl_6$txtDefendantRespondant", this.date);
+		
+		params = Files.loadListFromFile("properties/magistratesvic1_props.txt");
+		for (String param : params) {
+			String parts [] = param.split("=");
+			
+			if (parts.length == 2) {
+				postMethodParams.put(parts[0], parts[1]);
+			} else {
+				postMethodParams.put(parts[0], "");
+			}
+			
+		}
+		
+	//	System.out.println(pageHtml);
+		write(pageHtml);
+		
+		
+		postMethodProcessing();
+		
+		System.out.println("magistratesvic.com.au scrape FINISHED");
+		textArea.append("magistratesvic.com.au scrape FINISHED\n");
+		textArea.append("Check file magistratesvic_out_"+this.date+".csv");
+		
+		this.mainClassInstance.enableGUIAgain();
+	}
+	
+	Pattern detailsPattern = Pattern.compile("<a href=\"(/cerca/Pagine/SearchDetailResult.aspx.+?)\">");
+	HashSet<String> compaies = new HashSet<>();
+	
+	protected void postMethodProcessing() {
+		String pageHtml = null;
+
+		for (int i = firstPageNumber; i <= lastPageNumber; i += pageIncrement) {
+			postMethodParams.put(pageNumberParam, "ctl00$ctl00$ctl00$ContentPlaceHolderDefault$master_mainContentPlaceHolder$ctl00$PublicUserSearchCasesControl_6$dpCases$ctl02$ctl00");
+			System.out.println("Processing page " + i + " on magistratesvic.com.au");
+			textArea.append("Processing page " + i + " on magistratesvic.com.au\n");
+			
+			pageHtml = getHtmlByPost();
+		//	System.out.println(pageHtml);			
+
+			if (pageHtml != null) {
+				write(pageHtml);
+				
+				Matcher paginationMatcher = paginationPattern.matcher(pageHtml);
+				if (paginationMatcher.find()) {
+					break;					
+				}				
+			} else {
+				errorCount++;				
+			}
+			
+			sleep(3000);
+		}
+	}
+	
+	protected String getHtmlByPost() {
+		if (httpClient == null) {
+			httpClient = new HttpClient();
+		}
+		BufferedReader br;
+		StringBuffer html = new StringBuffer();
+		String temp;
+		PostMethod method = new PostMethod(postPageURL);
+
+		
+		method.setRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/34.0.1847.131 Safari/537.36");
+		method.setRequestHeader("Referer", "https://dailylists.magistratesvic.com.au/search-court-lists.aspx?");
+		method.setRequestHeader("Host", "dailylists.magistratesvic.com.au");
+		method.setRequestHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+		method.setRequestHeader("Accept-Encoding", "gzip, deflate");
+		method.setRequestHeader("Accept-Language", "sr,sr-rs;q=0.8,sr-cs;q=0.6,en-us;q=0.4,en;q=0.2");
+		method.setRequestHeader("Connection", "keep-alive");
+		
+		for (String param : postMethodParams.keySet()) {
+			method.addParameter(param, postMethodParams.get(param));
+		}
+
+		try {
+			int statusCode = httpClient.executeMethod(method);
+			if (statusCode == HttpStatus.SC_OK) {
+				br = new BufferedReader(new InputStreamReader(method.getResponseBodyAsStream(), charset));
+				while ((temp = br.readLine()) != null) {
+					html.append(temp).append("\n");
+				}
+
+				br.close();
+				
+				String pageHtml = html.toString();
+				
+				String viewstate = findInString(pageHtml, Pattern.compile("id=\"__VIEWSTATE\" value=\"(.+?)\""));
+
+				postMethodParams.put("__VIEWSTATE", viewstate);
+				
+				return pageHtml;
+			} else {
+				return null;
+			}
+		} catch (Exception e) {
+			System.err.println("#### GREŠKA ZA: " + postPageURL + " ####");
+			e.printStackTrace();			
+			return null;
+		}
+	}
+	
+	@Override
+	public void write (String data) {
+		String tableWrap = findInString(data, divWrap);
+		ArrayList<String> trWrapData = findAllInString(tableWrap, trWrap);
+		
+		for (int j = 0; j < trWrapData.size(); j++) {
+			if (j == 0) continue;
+			
+			ArrayList<String> tdData = findAllInString(trWrapData.get(j), tdPattern);
+			
+			for (int i = 0; i < tdData.size(); i++) {
+				pProc.addData(i+1, tdData.get(i));
+			}
+			
+			pProc.processPatterns(data, writter);
+		}
+	}
+	
+}
+
+

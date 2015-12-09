@@ -1,0 +1,517 @@
+package bots;
+
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.sql.Timestamp;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.zip.GZIPInputStream;
+
+import org.apache.commons.httpclient.Cookie;
+import org.apache.commons.httpclient.Header;
+import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.HttpStatus;
+import org.apache.commons.httpclient.cookie.CookiePolicy;
+import org.apache.commons.httpclient.methods.GetMethod;
+import org.apache.commons.httpclient.methods.PostMethod;
+import org.apache.commons.httpclient.methods.StringRequestEntity;
+import org.apache.commons.httpclient.params.HttpMethodParams;
+
+import util.DBWorks;
+import util.Sha1Hash;
+
+import loaders.PropertiesLoader;
+import master.Master;
+
+public class HealthGrades extends Master {
+	
+	private Pattern namePattern;
+	private Pattern subSecPattern;
+	private Pattern ratingPattern;
+	private Pattern statePattern;
+
+	private Pattern officesPattern;
+	private Pattern offNamePattern;
+	private Pattern offAddrPattern;
+	private Pattern offAddr2Pattern;
+	private Pattern offTelPattern;
+	private Pattern subSecPattern2;
+	
+	private BufferedWriter errorPages;
+	private BufferedWriter outDoctors;
+	private BufferedWriter outSpec;
+	private Pattern otherSpecPattern;
+	private Pattern otherGendAgePattern;
+	private Pattern otherAgePattern;
+	private Pattern offices2Pattern;
+	private Pattern reviewsPattern;
+	private Pattern fullNamePattern;
+	private Pattern specialtyPattern;
+	private Pattern titlePattern;
+	private Pattern urlPattern;
+	private Pattern specsWrapPattern;
+	private Pattern otherSpecWrapPattern;
+	
+
+	public HealthGrades()	{
+		super("helathgrades");
+		baseURL = "http://www.healthgrades.com";
+		
+		firefoxMask = true;		
+		
+		initWritters();
+		
+		java.util.logging.Logger.getLogger("org.apache.http.wire").setLevel(java.util.logging.Level.FINEST);
+		java.util.logging.Logger.getLogger("org.apache.http.headers").setLevel(java.util.logging.Level.FINEST);
+		System.setProperty("org.apache.commons.logging.Log", "org.apache.commons.logging.impl.SimpleLog");
+		System.setProperty("org.apache.commons.logging.simplelog.showdatetime", "true");
+		System.setProperty("org.apache.commons.logging.simplelog.log.httpclient.wire", "ERROR");
+		System.setProperty("org.apache.commons.logging.simplelog.log.org.apache.http", "ERROR");
+		System.setProperty("org.apache.commons.logging.simplelog.log.org.apache.http.headers", "ERROR");
+		
+		try {
+			errorPages = new BufferedWriter(new FileWriter("errorPages.txt"));
+		} catch (Exception e) {
+			// TODO: handle exception
+		}
+		
+		
+	//	executeGet();
+	//	executePost();
+		
+		
+		incrementPartOneURL = "http://www.healthgrades.com/provider-search-directory/search/ProviderResultsSection?f.distance=&prem=&sortby=bestmatch&q=Psychiatry&prof.type=provider&search.type=PracticingSpecialty&entityCode=PS802&method=rollup+specialty&loc=Minnesota&pt=&isNeighborhood=&locType=%7Cstate%7Ccity%7Czip&locIsSolrCity=&pagenumber=";
+	//	incrementPartOneURL = "http://www.healthgrades.com/provider-search-directory/search/ProviderResultsSection?f.distance=&prem=&sortby=bestmatch&q=Psychiatrist&prof.type=provider&search.type=PracticingSpecialty&entityCode=PS802&method=rollup+specialty&loc=Minnesota&pt=&isNeighborhood=&locType=%7Cstate%7Ccity%7Czip&locIsSolrCity=&f.rollupspecId=PS802&f.pspecid=PS802&_=1403804539541&pagenumber=";
+		
+		pageIncrement = 1;
+		firstPageNumber = 1;
+		paginationCheckTime = 5000;
+		
+		paginationPattern = Pattern.compile("<span class=\"nextPage\">");
+		detailsPagePattern = Pattern.compile("listingHeaderLeftColumn.+?<a href=\"(.+?)\"", Pattern.DOTALL);
+		
+		namePattern = Pattern.compile("<span itemprop=\"name\">(?:Dr\\.\\s+|)(.+?)(?:,|<)");
+		fullNamePattern = Pattern.compile("<span itemprop=\"name\">(.+?)<");
+		specialtyPattern = Pattern.compile("Specialties</h4>.+?<li>\\s+(.+?)\\s+</li>", Pattern.DOTALL);
+		titlePattern = Pattern.compile(",\\s+(.+)");
+		
+		subSecPattern = Pattern.compile("<span class=\"category\">Specializes in\\s+(.+?)</span>\\s+\\&bull;\\s+(.+?)\\&bull;\\s+Age\\s+(\\d+)");
+		subSecPattern2 = Pattern.compile("<span class=\"category\">Specializes in\\s+(.+?)</span>\\s+\\&bull;\\s+(.+?)\\s+</h2>");
+		ratingPattern = Pattern.compile("summarySpecialtyInner\">.+?<span class=\"callout\">\\s+<a\\s+href.+?title=\"(.+?)\"", Pattern.DOTALL);
+		reviewsPattern = Pattern.compile("class=\"responsesLabel\"\\s+title=\"(.+?)\"");
+		statePattern = Pattern.compile("http:\\/\\/www\\.healthgrades\\.com\\/(?:\\w|-)+-directory\\/(\\w{2})-");
+						
+		// from offices page
+		officesPattern = Pattern.compile("<div class=\"officeItemRight\">(.+?)</div>", Pattern.DOTALL);
+		offices2Pattern = Pattern.compile("<div class=\"practiceRightColumn\">(.+?)</div>", Pattern.DOTALL);
+		offNamePattern = Pattern.compile("<dt><a href.+?>(.+?)</a>");
+		offAddrPattern = Pattern.compile("<dd>(.+?)</dd>");
+		offAddr2Pattern = Pattern.compile("</dd>\\s+<dd>\\s+(.+?),\\s+(\\w{2})\\s+(\\d{5})\\s+</dd>");
+		offTelPattern = Pattern.compile("<dd class=\"phoneNumber\">(.+?)\\(Office\\)</dd>");
+				
+		
+		// different page patterns
+		otherSpecPattern = Pattern.compile("<span class=\"category\">(.+?)</span>");
+		otherGendAgePattern = Pattern.compile("<span class=\"category\">.+?<p>(.+?)</p>", Pattern.DOTALL);
+		otherAgePattern = Pattern.compile("Age\\s+(\\d+),", Pattern.DOTALL);
+		
+		specsWrapPattern = Pattern.compile("<h4>Specialties</h4>(.+?)</ul>", Pattern.DOTALL);
+		otherSpecWrapPattern = Pattern.compile("Specialty</h2>(.+?)</ul>", Pattern.DOTALL);
+	}	
+	
+	private void initWritters() {
+		try {
+			outDoctors = new BufferedWriter(new FileWriter("Health Grades 2.csv"));
+			outDoctors.write("First Name,Last Name,Title,Name,Gender,Rating,Number of Responses,Address,City,State,Zip Code,Phone,Speciality");
+			outDoctors.newLine();
+			
+			outSpec = new BufferedWriter(new FileWriter("hgspecs.csv"));
+			outSpec.write("First Name,Last Name,Name,Speciality");
+			outSpec.newLine();
+			
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+	}
+	
+	protected void typeOneProcessing() {
+		
+		paginationURL = null;
+		detailsPageURL = null;
+		String pageHtml = null;
+		String carHtml = null;
+		String experienceHtml = null;
+		String companiesHtml = null;
+		String carURLHash = null;
+		int errorDelay = initialErrorDelay;
+
+		Matcher paginationMatcher;
+		Matcher urlMatcher;
+		HashSet<String> docUrls;
+
+		mainLoop: for (int i = firstPageNumber; i <= lastPageNumber; i += pageIncrement) {
+			paginationURL = incrementPartOneURL + formParam + formValue + pageNumberParam + i + incrementPartTwoURL;
+			pageHtml = getHtml(paginationURL);
+			
+		//	System.out.println(pageHtml);
+
+			if (pageHtml != null) {
+				System.out.println("-Pagination page: " + paginationURL);
+				errorCount = 0;
+				errorDelay = initialErrorDelay;
+				urlMatcher = detailsPagePattern.matcher(pageHtml);
+			//	docUrls = new HashSet<String>();
+				while (urlMatcher.find()) {
+					detailsPageURL = urlMatcher.group(1);
+					detailsPageURL = detailsPageURL.toLowerCase();
+					if (!detailsPageURL.startsWith("http:")) {
+						detailsPageURL = baseURL + detailsPageURL;
+					}
+
+					detailsPageURL = fixURL(detailsPageURL);
+				//	detailsPageURL = "http://www.healthgrades.com/physician/dr-morris-hund-2ny8d";
+					
+					processUrl();					
+				}
+				paginationMatcher = paginationPattern.matcher(pageHtml);
+				if (!paginationMatcher.find()) {
+					if (paginationCheckTime != 0) {
+					//	System.out.println("Last pagination check for " + webSiteID + " in progress ...");
+						sleep(paginationCheckTime);
+
+						pageHtml = getHtml(detailsPageURL);
+						if (pageHtml == null) {
+							break;
+						}
+
+						paginationMatcher = paginationPattern.matcher(pageHtml);
+						if (!paginationMatcher.find()) {
+							break;
+						} else {
+							i -= pageIncrement;
+						}
+					} else {
+						break;
+					}
+				}
+			} else {
+				errorCount++;
+				if (errorCount == 5) {
+					break;
+				}
+				i -= pageIncrement;
+				
+				sleep(errorDelay);
+				errorDelay *= 5;				
+			}
+			if (stopped) {
+				break;
+			}
+		}
+	}
+	
+	private void processUrl() {
+	//	carURL = "http://www.healthgrades.com/physician/dr-john-hungarland-xbf6l";
+		
+		System.out.print("\t"+ recordCount + ". " + detailsPageURL);
+		
+		String carHtml = getPageContent(detailsPageURL);
+		String experienceHtml = getPageContent(detailsPageURL + "/background-check");
+		String companiesHtml = getPageContent(detailsPageURL + "/appointment");
+		
+		if (carHtml == null || companiesHtml == null || experienceHtml == null) {
+			writeErrorPage(detailsPageURL+"~fetch error");
+		}
+		
+		System.out.println(" - NEW");
+		
+		if (carHtml != null) {
+			write(carHtml, companiesHtml, experienceHtml);
+			recordCount++;
+			sleep(requestDelay);
+		}
+		
+	}
+
+	private String getPageContent(String carURL) {
+		String html = null;
+		int tries = 0;
+		
+		while (html == null) {
+			tries++;
+			try {			
+				HttpURLConnection httpURL = (HttpURLConnection) new URL(carURL).openConnection();
+				httpURL.setReadTimeout(60000);
+				httpURL.setConnectTimeout(60000);
+				
+				httpURL.setRequestProperty("User-Agent", "YahooBot/2.1 (https://www.yahoo.com/; contacts@yahoo.com)");			
+				
+				BufferedReader br = new BufferedReader(new InputStreamReader(httpURL.getInputStream()));
+				String line = "";
+				StringBuilder sb = new StringBuilder();
+				
+				while ((line = br.readLine()) != null) {
+					sb.append(line).append("\n");
+				}
+				
+				br.close();
+				html = sb.toString();
+				
+			} catch (Exception e) {				
+				e.printStackTrace();				
+			}
+			
+			if (tries == 5) {
+				break;
+			}
+		}
+		
+		return html;
+		
+	}
+
+	public static void main(String[] args) {
+		
+		new HealthGrades().run();
+	}
+
+	@Override
+	public void run() {
+		
+	//	ArrayList<String> specs = loadFromFile();
+		
+	//	for (String spec : specs) {
+	//		firstPageNumber = 1;
+	//		incrementPartOneURL = "http://www.healthgrades.com/provider-search-directory/search/ProviderResultsSection?f.distance=&prem=&sortby=bestmatch&q="+spec+"&prof.type=provider&search.type=PracticingSpecialty&entityCode=PS802&method=rollup+specialty&loc=Minnesota&pt=&isNeighborhood=&locType=%7Cstate%7Ccity%7Czip&locIsSolrCity=&f.rollupspecId=PS802&f.pspecid=PS802&_=1403804539541&pagenumber=";
+			typeOneProcessing();
+	//	}
+				
+		processingEnd();
+	}
+	
+	private ArrayList<String> loadFromFile() {
+		try {
+			ArrayList<String> urls = new ArrayList<String>();
+			BufferedReader in = new BufferedReader(new FileReader("specs.txt"));
+			String line = null;
+			
+			while ((line = in.readLine()) != null) {
+				if (line.trim().length() > 5) {
+					urls.add(line.trim());
+				}
+			}
+			
+			in.close();
+			return urls;
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+		return null;
+	}
+
+	public void write(String mainPage, String companiesHtml, String experienceHtml) {	
+		
+		String name = findInString(mainPage, namePattern);
+		String fullName = findInString(mainPage, fullNamePattern);
+		String title = findInString(fullName, titlePattern);
+		String gender = "";
+		
+		String nameParts[] = analyzeName(name);
+		
+		String parts [] = getSpecAgeGend(mainPage);//findGroupsInString(mainPage, subSecPattern, 3);
+		if (parts != null) {
+			gender = parts[1].trim();
+		}
+				
+		String rating = findInString(mainPage, ratingPattern);
+		if (rating.contains("out of")) { //ima rating
+			rating = rating.substring(0, rating.indexOf("out of")).trim();
+		} else {
+			rating = "";
+		}
+		
+		String rewiewCount = "";
+		if (!rating.equals("")) {
+			rewiewCount = findInString(mainPage, reviewsPattern);
+		}
+		
+		String state = findInString(mainPage, statePattern).toUpperCase();
+		String specialty = findInString(mainPage, specialtyPattern);
+		
+		ArrayList<String> allSpecs = findAllInString(findInString(experienceHtml, specsWrapPattern), Pattern.compile("<li>(.+?)</li>"));
+		if (allSpecs.size() == 0) {
+			allSpecs = findAllInString(findInString(experienceHtml, otherSpecWrapPattern), Pattern.compile("<li>(.+?)\\s+</li>"));
+			if (allSpecs.size() > 0) specialty = allSpecs.get(0);
+		}
+				
+		String offName = "";
+		String offAddress = "";
+		String offAddress2 [] = null;
+		String offTel = "";
+		
+		ArrayList<String> officesData = new ArrayList<String>();
+		ArrayList<String> offices = findAllInString(companiesHtml, officesPattern);
+		if (offices.size() == 0) {
+			offices = findAllInString(companiesHtml, offices2Pattern);
+			
+			Pattern officeNameP = Pattern.compile("<h4>(.+?)</h4>");
+			Pattern officeAdd1P = Pattern.compile("<p>\\s+(.+?)<br", Pattern.DOTALL);
+			Pattern officeAdd2P = Pattern.compile("<br />\\s+(.+?),\\s+(\\w{2})\\s+(\\d{5})<br");
+			Pattern phoneNumP = Pattern.compile("(\\(\\d{3}\\).+)<");
+			
+			for (String officeData : offices) {
+				StringBuilder sb = new StringBuilder();
+				
+				offName = findInString(officeData, officeNameP);
+				offAddress = findInString(officeData, officeAdd1P);
+				offAddress2 = findGroupsInString(officeData, officeAdd2P, 3);
+				offTel = findInString(officeData, phoneNumP).replaceAll("[^0-9-\\s]", " ").trim().replace("-", "").replaceAll("\\s+", "-");
+				
+				
+			//	sb.append("null, $$$, ").append(formatValue(offName)).append(", ").append(formatValue(offAddress)).append(", ").append(formatValue(offAddress2[0])).append(", ").append(formatValue(offAddress2[1])).append(", ").append(formatValue(offAddress2[2])).append(", ").append(formatValue(offTel)).append(", ").append(formatValue(offFax));
+			//	officesData.add(sb.toString());
+				break;
+			}
+		} else {
+			for (String officeData : offices) {
+				StringBuilder sb = new StringBuilder();
+				
+				offName = findInString(officeData, offNamePattern);
+				offAddress = findInString(officeData, offAddrPattern);
+				offAddress2 = findGroupsInString(officeData, offAddr2Pattern, 3);
+				offTel = findInString(officeData, offTelPattern).replaceAll("[^0-9-\\s]", " ").trim().replace("-", "").replaceAll("\\s+", "-");
+				
+				
+			//	sb.append("null, $$$, ").append(formatValue(offName)).append(", ").append(formatValue(offAddress)).append(", ").append(formatValue(offAddress2[0])).append(", ").append(formatValue(offAddress2[1])).append(", ").append(formatValue(offAddress2[2])).append(", ").append(formatValue(offTel)).append(", ").append(formatValue(offFax));
+			//	officesData.add(sb.toString());
+				break;
+			}
+		}	
+		
+
+		StringBuilder insertStatement = new StringBuilder();
+		
+		insertStatement.append(formatValue(name)).append(",").append(formatValue(gender)).append(",").append(formatValue(rating)).append(",").append(formatValue(rewiewCount)).append(",").append(formatValue(offAddress)).append(",").append(formatValue(offAddress2[0])).append(",");
+		insertStatement.append(formatValue(offAddress2[1])).append(",").append(formatValue(offAddress2[2])).append(",").append(formatValue(offTel)).append(",").append(formatValue(specialty));
+		
+		
+		StringBuilder forCSV = new StringBuilder();
+		forCSV.append(formatValue(nameParts[0])).append(",").append(formatValue(nameParts[1])).append(",").append(formatValue(title)).append(",").append(insertStatement);
+		writeLine(outDoctors, forCSV.toString());
+		
+		
+		
+		for (String spec : allSpecs) { 
+			StringBuilder forSpecs = new StringBuilder();
+			forSpecs.append(formatValue(nameParts[0])).append(",").append(formatValue(nameParts[1])).append(",").append(formatValue(name)).append(",").append(formatValue(spec));
+			writeLine(outSpec, forSpecs.toString());
+		}
+}
+	
+	private String[] analyzeName(String name) {
+		String nameParts [] = new String [2];
+		
+		name = name.replaceAll("(?:Dr\\.*|Mrs\\.*|Mr\\.*|Ms\\.*)\\s+", "");
+		if (name.contains(",")) {
+			name = name.substring(0, name.indexOf(","));
+		}
+		
+		String parts [] = name.split("\\s+");
+		
+		if (parts.length < 2) {
+			nameParts[0] = parts[0];
+			nameParts[1] = "";
+			return nameParts;
+		}
+		
+		if (parts.length == 2) {
+			return parts;
+		} 
+		
+		if (parts.length > 1) {
+			if (parts[1].length() == 1) {
+				nameParts [0] = parts[0];
+				nameParts [1] = name.substring(name.indexOf(parts[1]+" ") + 2);
+				return nameParts;
+			}
+			if (parts[1].length() == 2 && parts[1].charAt(1) == '.') {
+				nameParts [0] = parts[0];
+				nameParts [1] = name.substring(name.indexOf(parts[1]+" ") + 3);
+				return nameParts;
+			}
+			
+		}
+		
+		nameParts[0] = parts[0];
+		nameParts[1] = parts[1];
+		
+		return nameParts;
+	}
+	
+	private void writeLine(BufferedWriter out, String text) {
+		try {
+			out.write(text);
+			out.newLine();
+			out.flush();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+	
+	private String[] getSpecAgeGend(String mainPage) {
+		String [] parts = new String [3];
+		
+		String [] data = findGroupsInString(mainPage, subSecPattern, 3);
+		if (data != null && data.length == 3) { // ako je prvi tip
+			return data;
+		}
+		if (data == null) { // probamo drugi tip bez godina
+			data = findGroupsInString(mainPage, subSecPattern2, 2);
+			if (data != null) {
+				parts[0] = data[0];
+				parts[1] = data[1];
+				parts[2] = "-1";
+				return parts;
+			}
+		}
+		if (data == null) { // ako i dalje fali onda je ona druga strana
+			parts[0] = findInString(mainPage, otherSpecPattern);
+			String chunk = findInString(mainPage, otherGendAgePattern);
+			if (chunk.indexOf("Male") > -1) {
+				parts[1] = "Male";
+			} else {
+				parts[1] = "Female";
+			}
+			parts[2] = findInString(chunk, otherAgePattern);
+			if (parts[2].equals("")) parts[2] = "-1";
+			return parts;
+		}
+		
+		return null;
+	}
+
+	private void writeErrorPage(String carURL) {
+		try {
+			errorPages.write(carURL);
+			errorPages.newLine();
+			errorPages.flush();
+		} catch (Exception e) {
+			// TODO: handle exception
+		}
+		
+	}
+
+
+}
+
+

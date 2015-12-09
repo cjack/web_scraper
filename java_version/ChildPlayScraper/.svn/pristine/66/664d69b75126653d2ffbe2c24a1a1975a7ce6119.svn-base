@@ -1,0 +1,144 @@
+package bots;
+
+import java.io.BufferedInputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.regex.Matcher;
+
+import org.apache.commons.httpclient.Header;
+import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.HttpException;
+import org.apache.commons.httpclient.methods.GetMethod;
+import org.apache.commons.httpclient.methods.PostMethod;
+
+import util.Utils;
+import util.Files;
+import util.Writter;
+
+import master.Master;
+
+public class Alito extends Master{
+
+	private String file;
+	private ArrayList<String> rows;
+	private String[] r;
+	private String imageLink;
+	private String qty;
+	private String line;
+
+	public Alito() {
+		
+		writter = new Writter("alito.csv");
+		writter.writeLine("Qty,Title,Price,Product Code,Image URL,Manufacturer,Category,Ean code");
+	}
+	
+	public void run() {
+		
+		httpClient = new HttpClient();
+		
+		PostMethod post = new PostMethod("http://www.alito.cz/");
+		
+		post.setRequestHeader("Host", "www.alito.cz");
+		post.setRequestHeader("Referer", "http://www.alito.cz/");
+		post.setRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:42.0) Gecko/20100101 Firefox/42.0");
+		
+		post.setParameter("pwd", "heslo");
+		post.setParameter("redir", "/");
+		post.setParameter("remember", "1");
+		post.setParameter("v", "003868");
+		
+		try {
+			httpClient.executeMethod(post);
+		} catch (HttpException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		//Utils.printHeaders(post.getResponseHeaders());
+		
+		for(Header h : post.getResponseHeaders("Set-Cookie")) {
+			cookie += h.getValue().substring(0, h.getValue().indexOf(";")+1);
+		}
+		
+		
+		downloadFile("http://www.alito.cz/export.pricelist.php?csv_header=0&csv_cols=code,ean,name,cost1,currency,stock");
+		
+		rows = Files.loadListFromFile("temp.csv");
+		
+		for(String row : rows) {
+			 r = row.split("\t");
+			 imageLink = "http://www.alito.cz/i/?i=" + r[0] + ".jpg";
+			
+			// qty = r[5].replaceAll("\\D", "");
+			 r[3] = r[3].replaceAll(",", ".");
+			 r[5] = r[5].replaceAll("\\D", "");
+			 
+			 line = formatValue(r[5]) + formatValue(r[2]) + formatValue(r[3]) + formatValue(r[0]) + formatValue(imageLink) + formatValue("Branded") + formatValue("Other items") + formatValueWithoutAppend(r[1]);
+			 writter.writeLine(line);
+		}
+		
+		File f = new File("temp.csv");
+		if(f.exists()) {
+			f.delete();
+		}
+		
+	}
+	
+	private String cookie = "";
+	
+	public void write(String data) {
+		
+	}
+	
+	public void downloadFile(String fileUrl) {
+		try {
+			
+			GetMethod get = new GetMethod(fileUrl);
+			
+			get.setRequestHeader("Host", "www.alito.cz");
+			get.setRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:42.0) Gecko/20100101 Firefox/42.0");
+			get.setRequestHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+			get.setRequestHeader("Accept-Encoding", "gzip, deflate");
+			get.setRequestHeader("Accept-Language", "sr,sr-RS;q=0.8,sr-CS;q=0.6,en-US;q=0.4,en;q=0.2");
+			get.setRequestHeader("Authorization", "Basic MDAzODY4Omhlc2xv");
+			get.setRequestHeader("Connection", "keep-alive");
+			get.setRequestHeader("Cookie", cookie);
+			
+			httpClient.executeMethod(get);
+			
+			//Utils.printHeaders(get.getResponseHeaders());
+			
+			BufferedInputStream in = null;
+	        FileOutputStream fout = null;
+	        try {
+	            in = new BufferedInputStream(get.getResponseBodyAsStream());
+	            fout = new FileOutputStream("temp.csv");
+
+	            byte data[] = new byte[1024];
+	            int count;
+	            while ((count = in.read(data, 0, 1024)) != -1) {
+	            	fout.write(data, 0, count);
+	            }
+	            System.out.println("File: " + "temp.csv" + " downloaded!");
+	        } finally {
+	            if (in != null)
+	            	in.close();
+	            if (fout != null)
+	                fout.close();
+	        }
+			
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+	
+	public static void main(String[] args) {
+		new Alito().run();
+	}
+
+}

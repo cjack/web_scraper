@@ -1,0 +1,229 @@
+package bots;
+
+import master.Master;
+import util.*;
+
+import java.io.FileReader;
+import java.util.regex.Pattern;
+import java.util.*;
+
+import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.methods.GetMethod;
+
+public class Flashscore extends Master {
+	
+	Pattern codeP = Pattern.compile("~AA÷(.+?)¬");
+	Pattern prevGamesPat = Pattern.compile(">Last matches:\\s+(.+?)>Show more matches", Pattern.DOTALL);
+
+	public Flashscore(Integer firstPage, Integer lastPage) {		
+		this();
+		firstPageNumber = firstPage;
+		lastPageNumber = lastPage;
+	}
+	
+	public Flashscore() {		
+		pProc = new PatternProcessor();
+		
+		pProc.addReplacement(1, "<.+?>", "");
+		pProc.addReplacement(2, "<.+?>", "");
+	}	
+
+	public static void main(String[] args) {
+		if (args.length == 2) {
+			new Flashscore(Integer.parseInt(args[0]), Integer.parseInt(args[1])).start();
+		} else {
+			new Flashscore().start();
+		}
+		
+	}
+	
+	private String dateToScrape;
+
+	@Override
+	public void run() {
+		Properties p = new Properties();		
+		try {
+			p.load(new FileReader("input_date.txt"));
+			dateToScrape = p.getProperty("dateToScrape");			
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+		writter = new Writter("flashscore" + dateToScrape + ".csv");
+		writter.writeLine("Team Scored,Team Conceded,Time of Goal,Final Score");
+		
+		httpClient = new HttpClient();
+		GetMethod get = new GetMethod("http://d.flashscore.com/x/feed/f_1_-2_1_en_1");
+		
+		get.setRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:34.0) Gecko/20100101 Firefox/34.0");
+		get.setRequestHeader("Host", "d.flashscore.com");
+		get.setRequestHeader("Referer", "http://d.flashscore.com/x/feed/prox");
+		get.setRequestHeader("Accept", "*/*");
+		get.setRequestHeader("Accept-Encoding", "gzip, deflate");
+		get.setRequestHeader("Connection", "keep-alive");
+		get.setRequestHeader("Accept-Language", "*");
+		get.setRequestHeader("X-Fsign", "SW9D1eZo");
+		get.setRequestHeader("X-Requested-With", "XMLHttpRequest");
+		
+		ArrayList<String> gameCodes = null;
+		
+		try {
+			httpClient.executeMethod(get);
+			String pageHtml = getDataFromStream(get.getResponseBodyAsStream(), true);
+			gameCodes = findAllInString(pageHtml, codeP);
+
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+		for (String gameCode : gameCodes) {
+		//	gameCode = "xz5fTzLC";
+			get = new GetMethod("http://d.flashscore.com/x/feed/d_hh_"+gameCode+"_en_1");
+			//	get = new GetMethod("http://d.flashscore.com/x/feed/d_su_"+gameCode+"_en_1");
+			
+			get.setRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:34.0) Gecko/20100101 Firefox/34.0");
+			get.setRequestHeader("Host", "d.flashscore.com");
+			get.setRequestHeader("Referer", "http://d.flashscore.com/x/feed/prox");
+			get.setRequestHeader("Accept", "*/*");
+			get.setRequestHeader("Accept-Encoding", "gzip, deflate");
+			get.setRequestHeader("Connection", "keep-alive");
+			get.setRequestHeader("Accept-Language", "*");
+			get.setRequestHeader("X-Fsign", "SW9D1eZo");
+			get.setRequestHeader("X-GeoIP", "1");
+			get.setRequestHeader("X-Requested-With", "XMLHttpRequest");
+			
+			String pageData = null;
+			try {
+				httpClient.executeMethod(get);
+				pageData = getDataFromStream(get.getResponseBodyAsStream(), true);
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+			
+			if (pageData != null) {
+				ArrayList<String> prevMatchesData = findAllInString(pageData, prevGamesPat);
+				if (prevMatchesData.size() > 0) {
+					extractData(prevMatchesData.get(0));
+				}
+				
+				if (prevMatchesData.size() > 1) {
+					extractData(prevMatchesData.get(1));
+				}
+			}
+			
+			sleep(1000);
+		}
+		
+		
+	}
+	
+	Pattern gameCodesP = Pattern.compile("<td class=\"name.*?><span>(.+?)</span></td><td class=\"name.*?><span>(.+?)</span></td>.+?score\"><strong>(.+?)</strong>.+?detail_open\\('g_0_(.+?)',");	
+	
+	private void extractData(String data) {
+		ArrayList<String[]> gameDetails  = findAllGroupsInString(data, gameCodesP);
+		
+		String [] lastGame = gameDetails.get(0);
+		String [] secondLastGame = gameDetails.get(1);
+		
+		System.out.println("Extracting data from game " + lastGame[0].replaceAll("<.+?>", "") + " - " + lastGame[1].replaceAll("<.+?>", ""));
+		ArrayList<String> lastGameGoals = getGameStats(lastGame[3]);
+		sleep(1000);
+		
+		System.out.println("Extracting data from game " + secondLastGame[0].replaceAll("<.+?>", "") + " - " + secondLastGame[1].replaceAll("<.+?>", ""));
+		ArrayList<String> secondLastGameGoals = getGameStats(secondLastGame[3]);
+		sleep(1000);
+		
+		if (lastGameGoals != null) {
+			for (String goal : lastGameGoals) {
+				String parts [] = goal.split("~");
+				
+				if (parts[0].equals("home")) {
+					pProc.addData(1, lastGame[0]);
+					pProc.addData(2, lastGame[1]);				
+				} else {
+					pProc.addData(1, lastGame[1]);
+					pProc.addData(2, lastGame[0]);
+				}
+				pProc.addData(3, parts[1]);
+				pProc.addData(4, lastGame[2]);
+				
+				System.out.println("Found late goal on " + lastGame[0].replaceAll("<.+?>", "") + " - " + lastGame[1].replaceAll("<.+?>", ""));
+				pProc.processPatterns(data, writter);
+			}
+		}
+		
+		if (secondLastGameGoals != null) {
+			for (String goal : secondLastGameGoals) {
+				String parts [] = goal.split("~");
+				
+				if (parts[0].equals("home")) {
+					pProc.addData(1, secondLastGame[0]);
+					pProc.addData(2, secondLastGame[1]);				
+				} else {
+					pProc.addData(1, secondLastGame[1]);
+					pProc.addData(2, secondLastGame[0]);
+				}
+				pProc.addData(3, parts[1]);
+				pProc.addData(4, secondLastGame[2]);
+				
+				System.out.println("Found late goal on " + secondLastGame[0].replaceAll("<.+?>", "") + " - " + secondLastGame[1].replaceAll("<.+?>", ""));
+				pProc.processPatterns(data, writter);
+			}
+		}
+	}
+	
+	Pattern goalPat = Pattern.compile("<td class=\"summary-vertical (f[lr])\"><div class=\"wrapper\"><div class=\"time-box(?:-wide|)\">([\\d\\+]+)'</div><div class=\"icon-box soccer-ball\">");
+
+	private ArrayList<String> getGameStats(String code) {		
+		
+		ArrayList<String> lateGoals = new ArrayList<String>();
+		
+		GetMethod get = new GetMethod("http://d.flashscore.com/x/feed/d_su_"+code+"_en_1");
+				
+		get.setRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:34.0) Gecko/20100101 Firefox/34.0");
+		get.setRequestHeader("Host", "d.flashscore.com");
+		get.setRequestHeader("Referer", "http://d.flashscore.com/x/feed/prox");
+		get.setRequestHeader("Accept", "*/*");
+		get.setRequestHeader("Accept-Encoding", "gzip, deflate");
+		get.setRequestHeader("Connection", "keep-alive");
+		get.setRequestHeader("Accept-Language", "*");
+		get.setRequestHeader("X-Fsign", "SW9D1eZo");
+		get.setRequestHeader("X-GeoIP", "1");
+		get.setRequestHeader("X-Requested-With", "XMLHttpRequest");
+		
+		String pageHtml = null;
+		
+		try {
+			httpClient.executeMethod(get);
+			pageHtml = getDataFromStream(get.getResponseBodyAsStream(), true);
+		//	System.out.println(pageHtml);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+		if (pageHtml != null) {
+			ArrayList<String[]> goals = findAllGroupsInString(pageHtml, goalPat);
+			for (String [] goal : goals) {
+				if (goal[1].startsWith("90")) { // late goal
+					if (goal[0].equals("fl")) {
+						lateGoals.add("home~" + goal[1]);
+					} else {
+						lateGoals.add("away~" + goal[1]);
+					}
+				} 
+			}
+			
+			return lateGoals;
+		}
+		
+		return null;
+	}
+
+	@Override
+	public void write (String data) {
+		
+	}
+	
+}
+
+

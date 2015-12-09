@@ -1,0 +1,167 @@
+package bots.australia_jarris;
+
+import java.awt.Font;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.beans.PropertyChangeListener;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.HashSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import javax.swing.Action;
+import javax.swing.JButton;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JTextArea;
+import javax.swing.JTextField;
+import javax.swing.ScrollPaneConstants;
+
+import bots.ExampleSc;
+
+import master.Master;
+import util.*;
+
+public class StartClassGUI extends Master {
+	
+	private JButton vicButton = new JButton("VIC Search");
+	private JButton nswButton = new JButton("NSW Search");
+	private JTextField textF = new JTextField();
+	private JButton startScrape = new JButton("Search");
+	private JLabel courtTitleLabel = new JLabel();
+	private JLabel labelExample = new JLabel();
+	
+	private String searchSite = "vic"; 
+	private StartClassGUI mainClassInstance = this;
+	
+	public StartClassGUI() {			
+		//1. Create the frame.
+		JFrame frame = new JFrame("Upcoming court attendances");
+
+		//2. Optional: What happens when the frame closes?
+		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+		frame.setSize(500, 550);
+		frame.setResizable(false);
+		frame.setLocationRelativeTo(null);
+		frame.getContentPane().setLayout(null);
+		
+		vicButton.setSize(150, 30);
+		vicButton.setLocation(50, 20);
+		vicButton.setEnabled(false);
+		vicButton.addActionListener(new ActionListener() {
+			
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				vicButton.setEnabled(false);
+				nswButton.setEnabled(true);
+				searchSite = "vic";
+				courtTitleLabel.setText("VIC Court Search - Upcoming court attendances");
+				labelExample.setText("<html>Please enter last name and first name as \"last name, first name\"<br/>E.g. MacKenzie, Ken.<br/><br/>Partial matches are also returned, for example if \"Ken\" is entered the following names could be returned. \"MacKenzie\", \"Kenneth\".<br/>You can search in upper or lower case.</html>");
+				startScrape.setEnabled(true);
+			}
+		});
+		frame.getContentPane().add(vicButton);
+						
+		nswButton.setSize(150, 30);
+		nswButton.setLocation(300, 20);
+		nswButton.addActionListener(new ActionListener() {
+			
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				nswButton.setEnabled(false);
+				vicButton.setEnabled(true);
+				searchSite = "nsw";
+				courtTitleLabel.setText("NSW Court Search - Upcoming court attendances");
+				labelExample.setText("<html>Please enter both given names and a surname and select submit.<br/>E.g. William John Smith<br/><br/>If no results are returned, also try one given name and the surname.<br/>E.g. William Smith</html>");
+				startScrape.setEnabled(true);
+			}
+		});
+		frame.getContentPane().add(nswButton);
+		
+		
+		courtTitleLabel = new JLabel("VIC Court Search - Upcoming court attendances");
+		courtTitleLabel.setSize(550, 30);
+		courtTitleLabel.setLocation(20, 60);
+		courtTitleLabel.setFont(new Font(Font.SERIF, Font.BOLD, 20));
+		
+		labelExample = new JLabel("<html>Please enter last name and first name as \"last name, first name\"<br/>E.g. MacKenzie, Ken.<br/><br/>Partial matches are also returned, for example if \"Ken\" is entered the following names could be returned. \"MacKenzie\", \"Kenneth\".<br/>You can search in upper or lower case.</html>");
+			
+		labelExample.setSize(450, 100);
+		labelExample.setLocation(20, 100);
+		
+		textF.setSize(350, 25);
+		textF.setLocation(20, 210);
+		
+		
+		startScrape.setSize(100, 25);
+		startScrape.setLocation(380, 210);
+		
+		startScrape.addActionListener(new ActionListener() {			
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				String startingUrl = textF.getText();
+				if (startingUrl.trim().equals("")) {
+					JOptionPane.showMessageDialog(null, "Enter some link first");
+				}
+				
+				startScrape.setEnabled(false);
+				nswButton.setEnabled(false);
+				vicButton.setEnabled(false);
+				
+				textArea.append("Starting scrape of " + searchSite + "\n");
+				
+				if (searchSite.equals("vic")) {
+					new MagistratesvicGUI(textF.getText(), textArea, mainClassInstance).start();
+				}
+				if (searchSite.equals("nsw")) {
+					new LawlinkGUI(textF.getText(), textArea, mainClassInstance).start();
+				}
+			}
+		});
+		
+		JLabel label2 = new JLabel("Output");
+		label2.setSize(350, 20);
+		label2.setLocation(20, 250);
+		
+		textArea = new JTextArea();
+		textArea.setSize(460, 220);
+		textArea.setLocation(20, 280);
+		
+		JScrollPane scroll = new JScrollPane(textArea);
+		scroll.setSize(460, 220);
+		scroll.setLocation(20, 280);
+		
+        scroll.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS);
+        
+        frame.getContentPane().add(courtTitleLabel);
+        frame.getContentPane().add(labelExample);
+		frame.getContentPane().add(textF);
+		frame.getContentPane().add(startScrape);
+		frame.getContentPane().add(label2);	
+		frame.getContentPane().add(scroll);
+		
+		//5. Show it.
+		frame.setVisible(true);	
+		
+	}		
+	
+	private static JTextArea textArea;
+
+	public static void main(String[] args) {				
+		StartClassGUI scg = new StartClassGUI();
+	}
+
+	public void enableGUIAgain() {
+		nswButton.setEnabled(true);
+		vicButton.setEnabled(true);
+		searchSite = "";
+		courtTitleLabel.setText("Select Court To Search!");
+	}	
+	
+}
+
+

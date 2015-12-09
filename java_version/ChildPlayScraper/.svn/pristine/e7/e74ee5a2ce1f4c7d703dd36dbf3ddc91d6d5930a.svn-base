@@ -1,0 +1,127 @@
+package bots;
+
+import java.util.HashSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import util.PatternProcessor;
+import util.Sha1Hash;
+import util.Writter;
+
+import master.Master;
+
+public class YellowPagesMakao extends Master {
+
+	private Pattern categorySubCategoryNamePattern;
+	private String[] catSubCatName;
+
+	public YellowPagesMakao() {
+		
+		writter = new Writter("yellowPagesMacau.csv");
+		writter.writeLine("Company name,Category,Sub category,Address,Phone,Email,Website");
+		
+		pProc = new PatternProcessor();
+		
+		baseURL = "http://en.yp.mo";
+		detailsPagePattern = Pattern.compile("div class=\"detail.+?<a href=\"(.+?)\"", Pattern.DOTALL);
+		paginationPattern = Pattern.compile("Next <strong>&raquo;");
+		
+		categorySubCategoryNamePattern = Pattern.compile("<div id=\"breadcrumbs\".+?a href.+?>(.+?)<.+?a href.+?>(.+?)<.+?span.+?>(.+?)<", Pattern.DOTALL);
+		
+		pProc.addPattern(4, Pattern.compile("<strong style=\"display:block;font:16px/1.2 georgia, serif;margin-bottom:3px;\">(.+?)<")); //address
+		pProc.addPattern(5, Pattern.compile("<br\\s*/>Phone:\\s*<span>(.+?)<"));
+		pProc.addPattern(6, Pattern.compile("mailto:(.+?)\""));
+		pProc.addPattern(7, Pattern.compile("<a href=\"(http:.+?)\".+?Visit Website"));
+		
+		firstPageNumber = 1;
+		pageIncrement = 1;
+		
+		incrementPartOneURL = "http://en.yp.mo/business/?page=";
+		incrementPartTwoURL = "&order=&search=1&q=&location=";
+		
+		typeOneProcessing();
+		
+	}
+	
+	protected void typeOneProcessing() {
+		paginationURL = null;
+		detailsPageURL = null;
+		String pageHtml = null;
+		String detailsPageHtml = null;
+		String carURLHash = null;
+		long carID;
+		int errorDelay = initialErrorDelay;
+
+		Matcher paginationMatcher;
+		Matcher urlMatcher;
+		HashSet<String> carURLs;
+
+		mainLoop: for (int i = firstPageNumber; i <= lastPageNumber; i += pageIncrement) {
+			paginationURL = incrementPartOneURL + formParam + formValue + pageNumberParam + i + incrementPartTwoURL;
+			pageHtml = getHtml(paginationURL);
+			
+			//System.out.println(pageHtml);
+
+			if (pageHtml != null) {
+				System.out.println("-Pagination page: " + paginationURL);
+				errorCount = 0;
+				errorDelay = initialErrorDelay;
+				urlMatcher = detailsPagePattern.matcher(pageHtml);
+				carURLs = new HashSet<String>();
+				while (urlMatcher.find()) {
+					detailsPageURL = urlMatcher.group(1);
+					if (!detailsPageURL.startsWith("http:")) {
+						detailsPageURL = baseURL + detailsPageURL;
+						//System.out.println(detailsPageURL);
+					}
+
+					detailsPageURL = fixURL(detailsPageURL);
+					System.out.println("\t"+ detailsPageURL);
+					carURLHash = Sha1Hash.SHA1(detailsPageURL);
+
+					if (carURLs.contains(carURLHash)) {
+						continue;
+					} else {
+						carURLs.add(carURLHash);
+					}
+					
+
+					detailsPageHtml = getHtml(detailsPageURL);
+					//System.out.println("Ovde");
+					//da se obrise
+					//System.out.println(detailsPageHtml);
+
+					if (detailsPageHtml != null) {
+						//System.out.println("Usao");
+						write(detailsPageHtml);
+						recordCount++;
+						newRecordsCount++;
+					}
+					
+					sleep(requestDelay);
+				}
+				paginationMatcher = paginationPattern.matcher(pageHtml);
+				if (!paginationMatcher.find()) 
+					break;
+			}
+		}
+	}
+	
+	public void write(String data) {
+		
+		catSubCatName = findGroupsInString(data, categorySubCategoryNamePattern, 3);
+		
+		pProc.addData(1, catSubCatName[2]);
+		pProc.addData(2, catSubCatName[1]);
+		pProc.addData(3, catSubCatName[0]);
+		
+		pProc.processPatterns(data, writter);
+		
+	}
+	
+	public static void main(String[] args) {
+		
+		new YellowPagesMakao().run();
+	}
+
+}

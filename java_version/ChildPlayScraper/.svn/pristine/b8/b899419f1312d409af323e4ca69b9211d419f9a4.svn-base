@@ -1,0 +1,287 @@
+package bots;
+
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.regex.Pattern;
+import java.util.zip.GZIPInputStream;
+
+import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.HttpException;
+import org.apache.commons.httpclient.HttpMethod;
+import org.apache.commons.httpclient.methods.GetMethod;
+import org.unbescape.html.HtmlEscape;
+
+import util.PatternProcessor;
+import util.Writter;
+
+import master.Master;
+import util.Files;
+
+public class Parkweb extends Master {
+
+	private Pattern byNameWrapperPattern;
+	private Pattern byNamePattern;
+	private String byNameWrapper;
+	private ArrayList<String> byName;
+	private String byNameHtml;
+	private Pattern detLinkPattern;
+	private ArrayList<String> detLinks;
+	private String detHtml;
+	private Pattern imagePattern;
+	private ArrayList<String> images;
+	private int i;
+	private Pattern addInfoPattern;
+	private Pattern addInfoWrapperPattern;
+	private String addInfoWrapper;
+	private ArrayList<String> addInfo;
+	private String addInfoTxt;
+	private Pattern queryPattern;
+	private ArrayList<String> detUrls;
+	private String query;
+	private String latLonHtml;
+	private Pattern latLonPattern;
+	private ArrayList<String[]> latLong;
+	private Writter writterLastId;
+	private ArrayList<String> lastIdList;
+	private String lastId;
+	private String name2;
+	
+	public Parkweb() {
+		
+		File f = new File("parkweb.csv");
+		
+		if(!f.exists()) {
+			writter = new Writter("parkweb.csv");
+			writter.writeLine("Detail Page URL,ID,Name,Additional Info,Name 2,Lat,Lon");
+		}
+		else {
+			writter = new Writter("parkweb.csv", true);
+		}
+		
+		File f2 = new File("lastId.txt");
+		
+		if(!f2.exists()) {
+			writterLastId = new Writter("lastId.txt");
+			i = 1;
+		}
+		else {
+			writterLastId = new Writter("lastId.txt", true);
+			lastIdList = Files.loadListFromFile("lastId.txt");
+			lastId = lastIdList.get(lastIdList.size()-1);
+			i = Integer.parseInt(lastId);
+		}
+			
+		detUrls = Files.loadListFromFile("parkweb.csv", 1);
+
+		pProc = new PatternProcessor();
+		
+		byNameWrapperPattern = Pattern.compile("<h1 class=\"page-title\">Parks by name</h1>(.+?)</strong></p>", Pattern.DOTALL);
+		byNamePattern = Pattern.compile("<a href=\"(.+?)\"");		
+		detLinkPattern = Pattern.compile("<div class=\"search-result\">.+?a href=\"(.+?)\"", Pattern.DOTALL);
+		imagePattern = Pattern.compile("div class=\"media-image\".+?img src=\"(.+?)\"", Pattern.DOTALL);
+		addInfoWrapperPattern = Pattern.compile("div class=\"attractions\">(.+?)<div class=\"visitor-exp right\">", Pattern.DOTALL);
+		addInfoPattern = Pattern.compile("div class=\".+?>(.+?)<");
+		queryPattern = Pattern.compile("<span id=\"guid\".+?>(.+?)</span>");
+		latLonPattern = Pattern.compile("\\\\\"lat\\\\\":\\\\\"(.+?)\\\\\",\\s*\\\\\"lng\\\\\":\\\\\"(.+?)\\\\\"},\\\\\"title\\\\\":\\\\\"(.*?)\\\\\"");
+	
+		pProc.addPattern(3, Pattern.compile("<h1 class=\"page-title\">(.+?)</h1>"));
+		
+	}
+	
+	public void run() {
+		
+		String html = fetchPageContent("http://parkweb.vic.gov.au/explore/parks-by-name2");
+		
+		byNameWrapper = findInString(html, byNameWrapperPattern);
+		byName = findAllInString(byNameWrapper, byNamePattern);
+		
+		for(String name : byName) {
+			
+			byNameHtml = fetchPageContent(name);
+			
+			detLinks = findAllInString(byNameHtml, detLinkPattern);
+			
+			for(String link : detLinks) {
+				
+				//link = "http://parkweb.vic.gov.au/explore/parks/albert-park";
+				
+				writterLastId.writeLine(i + "");
+				
+				if(detUrls.contains("\"" + link + "\"")) {
+					continue;
+				}
+				
+				System.out.println(link);
+				
+				pProc.addData(1, link);
+				pProc.addData(2, i + "");
+							
+				httpClient = new HttpClient();
+				GetMethod get = new GetMethod(link);
+				
+				get.setRequestHeader("Host", "parkweb.vic.gov.au");
+				get.setRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/46.0.2490.80 Safari/537.36");
+				
+				try {
+					httpClient.executeMethod(get);
+				} catch (HttpException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+				detHtml = getData(get, false);
+				write(detHtml);
+				
+				i++;
+			}
+			
+		}
+	}
+	
+	private String getData(HttpMethod post, boolean gZip) {
+		try {
+			BufferedReader in;
+			if (gZip) {
+				in = new BufferedReader(new InputStreamReader(new GZIPInputStream(post.getResponseBodyAsStream()), "utf-8"));
+			} else {
+				in = new BufferedReader(new InputStreamReader(post.getResponseBodyAsStream(), "utf-8"));
+			}
+			
+			
+			String line;
+			StringBuilder sb = new StringBuilder();
+			
+			while ((line = in.readLine()) != null) {
+				sb.append(line);
+			}
+			
+			//System.out.println(sb.toString());
+			return sb.toString();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+		return null;
+	}
+	
+	public void write(String data) {
+		
+		images = findAllInString(data, imagePattern);
+		
+		if(!images.isEmpty()) {
+			
+			int j = 1;
+			
+			for(String image : images) {
+				try {	
+					File f = new File ("imagesParkWeb/");
+					if (!f.exists()) {
+						f.mkdirs();
+					}
+					saveImage(image, "imagesParkWeb/" + i + "_" + j + ".jpg");
+					j++;
+				} catch (IOException e2) {
+					// TODO Auto-generated catch block
+					e2.printStackTrace();							
+				}	
+			}
+			
+		}		
+		
+		addInfoWrapper = findInString(data, addInfoWrapperPattern);
+		if(!addInfoWrapper.equals("")) {
+			
+			addInfo = findAllInString(addInfoWrapper, addInfoPattern);
+			
+			if(addInfo.size() >= 1) {
+				addInfoTxt = "";	
+				
+				for(String info : addInfo) {
+					addInfoTxt += info + ", ";
+				}
+				
+				addInfoTxt = skloniSaKraja(addInfoTxt, ",");
+				
+				pProc.addData(4, addInfoTxt);
+			}
+			else {
+				pProc.addData(4, "");
+			}
+		}
+		else {
+			pProc.addData(4, "");
+		}
+				
+		query = findInString(data, queryPattern);
+			
+		latLonHtml = fetchPageContent("http://webmap.hphp.geomatic.com.au/MarsHandler.veplus?directory=PV_MAP_SPATIAL_ENTITY&cmd=getitemsbyid&searchtype=ParkLanding&searchOrder=MostPopular&center.x=0&center.y=0&showNumberedIcons=false&ajaxDataType=jsonp&getCount=true&pageSize=20&pageNo=1&query="+ query +"&_=" + System.currentTimeMillis());
+		
+		//System.out.println(latLonHtml);
+				
+		latLong = findAllGroupsInString(latLonHtml, latLonPattern);
+		
+		if(!latLong.isEmpty()) {
+			
+			for(String[] ll : latLong) {
+			
+				name2 = HtmlEscape.unescapeHtml(ll[2]);
+				pProc.addData(5, name2);
+				pProc.addData(6, ll[0]);
+				pProc.addData(7, ll[1]);
+				pProc.processPatterns(data, writter);
+			}
+			
+		}
+		else {
+			pProc.addData(5, "");
+			pProc.addData(6, "");
+			pProc.addData(7, "");
+			pProc.processPatterns(data, writter);
+		}
+		
+	}
+	
+	private String skloniSaKraja(String niska, String karakter) {
+		
+		niska = niska.trim();
+		
+		int duzinaNiske = niska.length();
+		
+		int pozKaraktera = niska.lastIndexOf(karakter);
+		
+		if(duzinaNiske-1 == pozKaraktera) {
+			niska = niska.substring(0, niska.length()-1);
+		}
+		
+		return niska;
+	}
+	
+	public static void saveImage(String imageUrl, String destinationFile) throws IOException {
+		URL url = new URL(imageUrl);
+		InputStream is = url.openStream();		
+		OutputStream os = new FileOutputStream(destinationFile);
+
+		byte[] b = new byte[2048];
+		int length;
+
+		while ((length = is.read(b)) != -1) {
+			os.write(b, 0, length);
+		}
+
+		is.close();
+		os.close();
+	}
+	public static void main(String[] args) {
+		new Parkweb().run();
+	}
+
+}

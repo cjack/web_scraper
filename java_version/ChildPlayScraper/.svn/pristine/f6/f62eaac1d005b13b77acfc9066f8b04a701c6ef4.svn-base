@@ -1,0 +1,99 @@
+package bots;
+
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.regex.Pattern;
+
+import util.PatternProcessor;
+import util.Patterns;
+import util.Writter;
+
+import master.Master;
+
+public class SajtoviDomeni extends Master {
+	
+	private SimpleDateFormat sdfForFile = new SimpleDateFormat("yyyy-MM-dd hh:mm:ss");
+
+	public SajtoviDomeni() {
+		
+		requestDelay = 1000;
+
+		pProc = new PatternProcessor();
+		writter = new Writter("outputSite.csv");
+		writter.writeLine("Post Title,Site,Price,Last Bid,Unique Visits,Page Views,Revenue,Thread Num,Poster name,Thread text,Time of scrape");
+		
+		pProc.addPattern(1, Pattern.compile("titleBar.+?\\s+.+?</span>\\s+(.+?)<", Pattern.DOTALL)); //title
+		//pProc.addPattern(2, Pattern.compile("For Sale:\\s+.+?href=\"(.+?)\"", Pattern.DOTALL)); //link
+		//ili ako nije ovo 2, onda ovo 3
+		pProc.addPattern(2, Pattern.compile("For Sale:\\s+.+?\">(.+?)<", Pattern.DOTALL)); // link
+		//p1Proc.addPattern(3, Pattern.compile("<meta itemprop=\"price\" content=\"(.+?)\"")); // buy now price
+		pProc.addPattern(3, Pattern.compile("value=\"Buy Now for\\s+(.+?)\""));
+		
+		pProc.addPattern(4, Pattern.compile("Current bid: <span>(.+?)<")); //current bid
+		pProc.addPattern(5, Pattern.compile("Unique Visitors.+?\\s+<dd>(.+?)<", Pattern.DOTALL)); //unique visitors
+		pProc.addPattern(6, Pattern.compile("Page Views.+?\\s+<dd>(.+?)<", Pattern.DOTALL)); // page views
+		pProc.addPattern(7, Pattern.compile("Revenue.+?\\s+<dd>(.+?)<", Pattern.DOTALL)); //revenue
+		pProc.addPattern(8, Pattern.compile("item muted postNumber.+?\\s+.+?>(.+?)<", Pattern.DOTALL)); // #1
+		pProc.addPattern(9, Pattern.compile("class=\"username\" dir=\"auto\">(.+?)<"));
+		pProc.addPattern(10, Pattern.compile("<blockquote itemprop=\"text\" class=\"messageText ugc baseHtml\">(.+?)</blockquote>", Pattern.DOTALL));
+		
+		pProc.addReplacement(1, "\\&amp;", "&");
+		pProc.addReplacement(10, "<.+?>", "");
+		pProc.addReplacement(10, "\"", "'");
+		pProc.addReplacement(10, "\\&amp;", "&");
+		
+//		p1Proc.addPattern(8, Pattern.compile("messageText.+?>\\s+(.+?)\\s+<", Pattern.DOTALL)); // ispred backlinks, iznad happy biding za pix4uav.com
+//		p1Proc.addPattern(9, Pattern.compile("messageText.+?\\s+.+?href.+?\\s+.+?\">(.+?)<", Pattern.DOTALL)); //treba da bude zajedno sa ovim iznad u 8
+//		p1Proc.addPattern(10, Pattern.compile("messageText.+?>\\s.+?</script>\\s+<br/>\\s+(.+?)\\s+<br/>", Pattern.DOTALL)); //happy biding(da se proveri) 
+	}
+	
+	public void run() {
+
+		detailsPagePattern = Pattern.compile("marketplaceItemMain.+?\\s+<a href=\"(.+?)\"", Pattern.DOTALL);
+		paginationPattern = Pattern.compile("Next &gt;");
+		
+		baseURL = "https://forums.digitalpoint.com/";
+		
+		firstPageNumber = 1;
+		pageIncrement = 1;
+		
+		incrementPartOneURL = "https://marketplace.digitalpoint.com/sites?page=";
+		
+		typeOneProcessing();
+		
+		writter.close();
+		
+		writter = new Writter("outputDomains.csv");
+		
+		
+		detailsPagePattern = Pattern.compile("marketplaceItemMain.+?\\s+<a href=\"(.+?)\"", Pattern.DOTALL);
+		paginationPattern = Pattern.compile("Next &gt;");
+		
+		baseURL = "https://forums.digitalpoint.com/";
+		
+		firstPageNumber = 1;
+		pageIncrement = 1;
+		
+		incrementPartOneURL = "https://marketplace.digitalpoint.com/domains?page=";
+		
+		typeOneProcessing();
+		
+		writter.close();
+		
+	}
+	
+	public void write (String data) {
+		
+		pProc.addData(11, sdfForFile.format(new Date())); // #1
+		
+		pProc.processPatterns(data, writter);
+		
+	}
+	public static void main(String[] args) {
+		
+		new SajtoviDomeni().run();
+	}
+	
+
+}

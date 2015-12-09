@@ -1,0 +1,246 @@
+package bots;
+
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.FileReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.net.URL;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashSet;
+import java.util.Properties;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import proxy.MultithreadedProxyFetcher;
+import proxy.ProxyFetcher;
+
+import util.Files;
+import util.PatternProcessor;
+import util.Sha1Hash;
+import util.Writter;
+
+import master.Master;
+
+public class YellowPagesCA extends Master {
+
+	private SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy");
+	ProxyFetcher proxyFetcher;
+	private String [] states;
+	private String [] categories;
+	private boolean allOnProxies;
+	private boolean multithreaded;
+	private Pattern titlePattern;
+	private Pattern postCodePattern;
+	
+	private MultithreadedProxyFetcher mpFetcher;
+	
+	public YellowPagesCA() {	
+		
+		Properties properties = new Properties();
+		try {
+			properties.load(new FileReader("yellProps.txt"));
+			states = properties.getProperty("states").split(",");
+			categories = properties.getProperty("categories").split(",");
+			firstPageNumber = Integer.parseInt(properties.getProperty("firstPage"));
+			allOnProxies = Boolean.parseBoolean(properties.getProperty("fullOnProxies"));
+			multithreaded = Boolean.parseBoolean(properties.getProperty("multithreaded"));
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+				
+		proxyFetcher = new ProxyFetcher();
+		pProc = new PatternProcessor();
+//		writter = new Writter("yellowout.csv");
+		
+		baseURL = "http://www.yellowpages.ca";
+		
+		firefoxMask = true;
+		
+	//	firstPageNumber = 93;
+		pageIncrement = 1;
+		requestDelay = 1000;
+		
+	//	lastPageNumber = 1;
+		
+		pProc.addPattern(1, Pattern.compile("<strong class=\"jsMerchantName\">(.+?)<"));
+		pProc.addPattern(4, Pattern.compile("itemprop=\"description\" >\\s+(.+?)(?:</span>|</article>)"));		
+		pProc.addPattern(5, Pattern.compile("<span itemprop=\"streetAddress\" >(.+?)<"));
+		pProc.addPattern(6, Pattern.compile("<span itemprop=\"addressLocality\" >(.+?)<"));
+		pProc.addPattern(7, Pattern.compile("<span itemprop=\"addressRegion\" >(.+?)<"));
+		pProc.addPattern(8, Pattern.compile("<span itemprop=\"postalCode\" >(.+?)<"));
+		pProc.addPattern(9, Pattern.compile("href=\"/gourl\\?(.+?)\""));
+		pProc.addPattern(10, Pattern.compile("<span class=\"ypicon ypicon-phone\"></span><span >(.+?)<"));
+		pProc.addPattern(11, Pattern.compile("\"latitude\":\\s+\"(.+?)\""));
+		pProc.addPattern(12, Pattern.compile("\"longitude\":\\s+\"(.+?)\""));		
+		
+		pProc.addReplacement(4, "<.+?>", "");
+		
+		titlePattern = Pattern.compile("<title>(.+?)</title>");
+		
+	//	incrementPartOneURL = "http://www.yellowpages.com/search?search_terms=Home%20Builders&geo_location_terms="+states[0]+"&s=relevance&page=";
+		
+		detailsPagePattern = Pattern.compile("itemprop=\"name\"><a data-analytics=.+?href=\"(.+?html)");
+		paginationPattern = Pattern.compile(">Next</a>");
+		
+	}
+	
+	protected void typeOneProcessing() {
+		paginationURL = null;
+		detailsPageURL = null;
+		String pageHtml = null;
+		String detailsPageHtml = null;
+		String carURLHash = null;
+
+		Matcher paginationMatcher;
+		Matcher urlMatcher;
+		HashSet<String> carURLs = new HashSet<String>();
+
+
+		String html = Files.loadFileData("canada2.txt");
+		ArrayList<String> links = findAllInString(html, detailsPagePattern);
+		System.out.println(links.size());
+		
+		urlMatcher = detailsPagePattern.matcher(html);
+		
+		while (urlMatcher.find()) {
+			
+			detailsPageURL = urlMatcher.group(1);
+			if (!detailsPageURL.startsWith("http:")) {
+				detailsPageURL = baseURL + detailsPageURL;
+			}
+
+			detailsPageURL = fixURL(detailsPageURL);
+			System.out.println("\t"+ detailsPageURL);
+			carURLHash = Sha1Hash.SHA1(detailsPageURL);
+			
+			if (carURLs.contains(carURLHash)) {
+				System.out.println("Contains " + detailsPageURL);
+				continue;
+			} else {						
+				carURLs.add(carURLHash);
+			}
+			
+			if (allOnProxies) {
+				if (multithreaded) {
+					mpFetcher.addUrl(detailsPageURL);
+					continue;
+				} else {
+					detailsPageHtml = proxyFetcher.getHtmlWithProxy(detailsPageURL, "yellowpages");
+				}
+			} else {
+				detailsPageHtml = getHtml(detailsPageURL);
+			}
+			
+
+			if (detailsPageHtml != null) {
+				write(detailsPageHtml);
+				recordCount++;
+				newRecordsCount++;						
+			}
+			
+			
+			sleep(requestDelay);
+		}
+				
+
+	}
+	
+	private Pattern imagePattern = Pattern.compile("<img  alt=\".+?src=\"(.+?)\"");
+		
+	public void write(String pageHtml) {		
+		String slika = findInString(pageHtml, imagePattern);
+		pProc.addData(2, slika);
+		
+		if(!slika.equals("")) {
+		
+			String linkSlike = slika;
+			
+			int i = slika.lastIndexOf("/");
+			
+			slika = slika.substring(i+1, slika.length());		
+			
+			try {
+				saveImage(linkSlike, "imgs/" + slika);
+			} catch (IOException e) {
+			
+				e.printStackTrace();
+			}
+			
+		}
+		
+		pProc.addData(3, slika);
+		
+		pProc.processPatterns(pageHtml, writter);
+	}
+	
+	public static void saveImage(String imageUrl, String destinationFile) throws IOException {
+		URL url = new URL(imageUrl);
+		java.net.URLConnection c = url.openConnection();
+		c.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:35.0) Gecko/20100101 Firefox/36.0");
+		c.setRequestProperty("Host", "www.yellowpages.ca");
+		
+		File f = new File(destinationFile);
+		if (f.exists()) return;
+		
+		InputStream is = c.getInputStream();
+		OutputStream os = new FileOutputStream(destinationFile);
+
+		byte[] b = new byte[2048];
+		int length;
+
+		while ((length = is.read(b)) != -1) {
+			os.write(b, 0, length);
+		}
+
+		is.close();
+		os.close();
+	}
+	
+	public static void main(String[] args) {		
+		new YellowPagesCA().run();
+	}
+	
+	
+	
+	public void run() {
+			
+		writter = new Writter("yellow_toronto.csv");
+		
+		if (multithreaded) {
+			mpFetcher = new MultithreadedProxyFetcher(pProc, writter, proxyFetcher);
+			mpFetcher.start();
+		}
+		
+		
+		
+		typeOneProcessing();
+		
+		if (multithreaded) {
+			mpFetcher.paginationsDone();
+			while (true) {
+				String html = mpFetcher.getHtml();
+				if (html == null) break;
+				if (html.equals("")) {
+					sleep(3000);
+					continue;
+				}
+				
+				write(html);
+			}
+			
+		} 
+		
+
+		
+		writter.close();
+		processingEnd();
+		
+	}
+
+}

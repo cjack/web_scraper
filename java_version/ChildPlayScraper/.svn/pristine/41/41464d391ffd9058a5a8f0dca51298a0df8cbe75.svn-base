@@ -1,0 +1,271 @@
+package bots;
+
+import master.Master;
+import util.*;
+
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.zip.GZIPInputStream;
+import java.util.*;
+
+import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.methods.GetMethod;
+import org.apache.commons.httpclient.methods.PostMethod;
+
+public class Freeuknumbers {
+	
+	private Writter routedNums;
+	private HttpClient httpClient;
+
+	private String username;
+	private String password;
+	
+	public Freeuknumbers() {		
+		try {
+			Properties props = new Properties();
+			props.load(new FileReader("account.txt"));
+			
+			username = props.getProperty("username");
+			password = props.getProperty("password");
+			
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+		System.out.println("Using username: " + username + " and password: " + password + "\n");
+		routedNums = new Writter("routedNumbers.txt");
+	}	
+
+	public static void main(String[] args) {
+		new Freeuknumbers().run();			
+	}
+
+	public void run() {
+		ArrayList<String> routeNumbers = Files.loadListFromFile("numbers.txt");
+				
+		System.out.print("Login in progress... ");
+		login();
+		System.out.println("DONE");
+		
+		while (true) {
+			for (String routeNum : routeNumbers) {
+				System.out.println("Processing number " + routeNum);
+				System.out.print("\tAdding new number...");
+				String newNumber = addNewNumber();
+				System.out.println("DONE");
+				
+				System.out.print("\tRouting number " + newNumber + " to " + routeNum + "... ");
+				rerouteNumber(newNumber, routeNum);
+				System.out.println("DONE");			
+			}
+		}
+		
+	}
+	
+	private Pattern numPat = Pattern.compile("<option value=\"(\\d+)\">");
+	
+	private String addNewNumber() {
+		try {
+			PostMethod post = new PostMethod("http://www.freeuknumbers.com/panel/number_mgr/add_number.php");
+			
+			post.setRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:37.0) Gecko/20100101 Firefox/37.0");
+			post.setRequestHeader("Host", "www.freeuknumbers.com");
+		//	post.setRequestHeader("Cookie", "_angellist=f7b92872e2081beca67f266b3115f2b7");
+			post.setRequestHeader("Accept-Encoding", "gzip, deflate");
+			post.setRequestHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+			post.setRequestHeader("Connection", "keep-alive");	
+			post.setRequestHeader("Referer", "http://www.freeuknumbers.com/panel/number_mgr/number_mgr.php");
+			
+			httpClient.executeMethod(post);
+			String pageHtml = getDataFromStream(post.getResponseBodyAsStream(), true);
+			
+			String number = findInString(pageHtml, numPat);
+			System.out.print(" added number " + number + "... ");
+			
+			post = new PostMethod("http://www.freeuknumbers.com/panel/number_mgr/process_number.php");
+			
+			post.setRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:37.0) Gecko/20100101 Firefox/37.0");
+			post.setRequestHeader("Host", "www.freeuknumbers.com");
+		//	post.setRequestHeader("Cookie", "_angellist=f7b92872e2081beca67f266b3115f2b7");
+			post.setRequestHeader("Accept-Encoding", "gzip, deflate");
+			post.setRequestHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+			post.setRequestHeader("Connection", "keep-alive");	
+			post.setRequestHeader("Referer", "http://www.freeuknumbers.com/panel/number_mgr/number_mgr.php");
+			
+			post.setParameter("number", number);
+			post.setParameter("react2", "add_number");
+			
+			httpClient.executeMethod(post);
+			
+			GetMethod get = new GetMethod("http://www.freeuknumbers.com/panel/number_mgr/activate/activate.php");
+			get.setRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:37.0) Gecko/20100101 Firefox/37.0");
+			get.setRequestHeader("Host", "www.freeuknumbers.com");
+			get.setRequestHeader("Accept-Encoding", "gzip, deflate");
+			get.setRequestHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+			get.setRequestHeader("Connection", "keep-alive");	
+			httpClient.executeMethod(get);
+			
+			get = new GetMethod("http://www.freeuknumbers.com/panel/number_mgr/number_added.php");
+			get.setRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:37.0) Gecko/20100101 Firefox/37.0");
+			get.setRequestHeader("Host", "www.freeuknumbers.com");
+			get.setRequestHeader("Accept-Encoding", "gzip, deflate");
+			get.setRequestHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+			get.setRequestHeader("Connection", "keep-alive");	
+
+		//	Thread.sleep(4000);
+			httpClient.executeMethod(get);
+			
+			return number;
+		} catch (Exception e) {
+			// TODO: handle exception
+		}
+		
+		return null;
+	}
+
+	private void rerouteNumber(String numberFrom, String numberTo) {
+		try {
+			PostMethod post = new PostMethod("http://www.freeuknumbers.com/panel/number_mgr/processing_route.php");
+			
+			String networkNum = numberFrom.replaceFirst("0", "+44");
+			
+			post.setParameter("callid", "See Whos Calling Me");
+			post.setParameter("callid_custom", "");
+			post.setParameter("intnum", numberTo);
+			post.setParameter("network_number", networkNum);
+			post.setParameter("tone", "United Kingdom");
+			post.setParameter("user", numberFrom);
+			post.setParameter("voip", "0");
+			
+			post.setRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:37.0) Gecko/20100101 Firefox/37.0");
+			post.setRequestHeader("Host", "www.freeuknumbers.com");
+		//	post.setRequestHeader("Cookie", "_angellist=f7b92872e2081beca67f266b3115f2b7");
+			post.setRequestHeader("Accept-Encoding", "gzip, deflate");
+			post.setRequestHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+			post.setRequestHeader("Connection", "keep-alive");	
+			post.setRequestHeader("Referer", "http://www.freeuknumbers.com/panel/number_mgr/configurestdnumber_standard.php");
+			
+			httpClient.executeMethod(post);
+		//	System.out.println(getDataFromStream(post.getResponseBodyAsStream(), true));
+			
+			GetMethod get = new GetMethod("http://www.freeuknumbers.com/panel/number_mgr/process_route_new.php");
+			get.setRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:37.0) Gecko/20100101 Firefox/37.0");
+			get.setRequestHeader("Host", "www.freeuknumbers.com");
+			get.setRequestHeader("Accept-Encoding", "gzip, deflate");
+			get.setRequestHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+			get.setRequestHeader("Connection", "keep-alive");	
+			httpClient.executeMethod(get);
+			
+			get = new GetMethod("http://www.freeuknumbers.com/panel/number_mgr/process_route_complete.php");
+			get.setRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:37.0) Gecko/20100101 Firefox/37.0");
+			get.setRequestHeader("Host", "www.freeuknumbers.com");
+			get.setRequestHeader("Accept-Encoding", "gzip, deflate");
+			get.setRequestHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+			get.setRequestHeader("Connection", "keep-alive");	
+
+		//	Thread.sleep(4000);
+			httpClient.executeMethod(get);
+		//	System.out.println(getDataFromStream(get.getResponseBodyAsStream(), true));
+			routedNums.writeLine(networkNum + "." + numberTo);
+			
+		} catch (Exception e) {
+			// TODO: handle exception
+		}
+		
+	}
+
+	private void login() {
+		try {
+			httpClient = new HttpClient();
+			
+			PostMethod post = new PostMethod("http://www.freeuknumbers.com/panel/login_handle.php");
+			
+			post.setParameter("account", username);
+			post.setParameter("password", password);
+			
+			post.setRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:37.0) Gecko/20100101 Firefox/37.0");
+			post.setRequestHeader("Host", "www.freeuknumbers.com");
+		//	post.setRequestHeader("Cookie", "_angellist=f7b92872e2081beca67f266b3115f2b7");
+			post.setRequestHeader("Accept-Encoding", "gzip, deflate");
+			post.setRequestHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+			post.setRequestHeader("Connection", "keep-alive");	
+			post.setRequestHeader("Referer", "http://www.freeuknumbers.com/panel/logout.php");
+			
+			httpClient.executeMethod(post);
+		//	System.out.println(getDataFromStream(post.getResponseBodyAsStream(), true));
+			
+			GetMethod get = new GetMethod("http://www.freeuknumbers.com/panel/login_process.php");
+			get.setRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:37.0) Gecko/20100101 Firefox/37.0");
+			get.setRequestHeader("Host", "www.freeuknumbers.com");
+			get.setRequestHeader("Accept-Encoding", "gzip, deflate");
+			get.setRequestHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+			get.setRequestHeader("Connection", "keep-alive");	
+			httpClient.executeMethod(get);
+		//	System.out.println(getDataFromStream(get.getResponseBodyAsStream(), true));
+			
+			get = new GetMethod("http://www.freeuknumbers.com/panel/index.php");
+			get.setRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:37.0) Gecko/20100101 Firefox/37.0");
+			get.setRequestHeader("Host", "www.freeuknumbers.com");
+			get.setRequestHeader("Accept-Encoding", "gzip, deflate");
+			get.setRequestHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+			get.setRequestHeader("Connection", "keep-alive");	
+
+		//	Thread.sleep(4000);
+			httpClient.executeMethod(get);
+		//	System.out.println(getDataFromStream(get.getResponseBodyAsStream(), true));
+		} catch (Exception e) {
+			// TODO: handle exception
+		}
+		
+	}
+	
+	private String getDataFromStream(InputStream inS, boolean inGZIP) {
+		try {
+			BufferedReader in = null;
+			if (inGZIP) {
+				in = new BufferedReader(new InputStreamReader(new GZIPInputStream(inS)));
+			} else {
+				in = new BufferedReader(new InputStreamReader(inS));
+			}
+			
+			StringBuilder sb = new StringBuilder();
+			String line = null;
+			while ((line = in.readLine()) != null) {
+				sb.append(line).append("\n");
+			}
+			
+			in.close();
+			return sb.toString();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+		return null;
+	}
+	
+	private String findInString(String string, Pattern pattern) {
+		if (pattern == null) return "";
+		Matcher m = pattern.matcher(string);
+		while (m.find()) {
+			String value = m.group(1).trim();
+		//	System.out.println(value);
+			return value;
+		}
+		return "";
+	}
+	
+	private void sleep(int time) {
+		try {
+			Thread.sleep(time);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+}
+
+

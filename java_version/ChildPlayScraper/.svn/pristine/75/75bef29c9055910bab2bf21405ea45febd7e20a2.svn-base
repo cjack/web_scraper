@@ -1,0 +1,301 @@
+package bots;
+
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.FileReader;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Properties;
+
+import org.json.JSONObject;
+
+import util.Utils;
+
+public class OpenSignal {
+	
+	private String apiID;
+	
+	private ArrayList<String []> inputCoordinates;
+
+	private BufferedWriter out;
+	
+	private int recordCount = 1;
+	
+	private String [] keys = new String [] {"networkName", "networkType", "networkId", "downloadSpeed", "uploadSpeed", "pingTime", "reliability", "sampleSizeRSSI", "averageRssiDb", "averageRssiAsu"};
+	
+	private HashMap<String, HashSet<String>> allKeysPerNetwork = new HashMap<String, HashSet<String>>();
+	
+	public OpenSignal() {		
+	//	String data = "{\"apiVersion\":\"2\",\"latitude\":\"-6.21444484\",\"longitude\":\"106.9033777\",\"distance\":\"10\",\"network_type\":\"\",\"perMinuteCurrent\":2,\"perMinuteLimit\":10,\"perMonthCurrent\":338,\"perMonthLimit\":2000,\"networkRank\":{\"network51010\":{\"type3G\":{\"networkName\":\"TELKOMSEL\",\"networkId\":\"51010\",\"networkType\":\"3\",\"averageRssiAsu\":\"18.457108\",\"averageRssiDb\":\"-76.085784\",\"sampleSizeRSSI\":\"454940\",\"downloadSpeed\":\"1626.8887\",\"uploadSpeed\":\"915.5665\",\"pingTime\":\"415.5065\",\"reliability\":\"0.93437731\"},\"type2G\":{\"networkName\":\"TELKOMSEL\",\"networkId\":\"51010\",\"networkType\":\"2\",\"averageRssiAsu\":\"16.824309\",\"averageRssiDb\":\"-79.351382\",\"sampleSizeRSSI\":\"111861\",\"downloadSpeed\":\"532.9392\",\"uploadSpeed\":\"511.6106\",\"pingTime\":\"465.9848\",\"reliability\":\"0.91177347\"}},\"network51011\":{\"type3G\":{\"networkName\":\"XL\",\"networkId\":\"51011\",\"networkType\":\"3\",\"averageRssiAsu\":\"17.158156\",\"averageRssiDb\":\"-78.683688\",\"sampleSizeRSSI\":\"306167\",\"downloadSpeed\":\"2239.3323\",\"uploadSpeed\":\"1104.1844\",\"pingTime\":\"324.2772\",\"reliability\":\"0.92232385\"},\"type2G\":{\"networkName\":\"XL\",\"networkId\":\"51011\",\"networkType\":\"2\",\"averageRssiAsu\":\"15.747363\",\"averageRssiDb\":\"-81.505273\",\"sampleSizeRSSI\":\"46127\",\"downloadSpeed\":\"602.6406\",\"uploadSpeed\":\"217.2609\",\"pingTime\":\"463.5741\",\"reliability\":\"0.88215846\"}},\"network51001\":{\"type3G\":{\"networkName\":\"INDOSAT\",\"networkId\":\"51001\",\"networkType\":\"3\",\"averageRssiAsu\":\"14.489036\",\"averageRssiDb\":\"-84.021929\",\"sampleSizeRSSI\":\"210510\",\"downloadSpeed\":\"2125.0258\",\"uploadSpeed\":\"766.2926\",\"pingTime\":\"347.1702\",\"reliability\":\"0.93354357\"},\"type2G\":{\"networkName\":\"INDOSAT\",\"networkId\":\"51001\",\"networkType\":\"2\",\"averageRssiAsu\":\"16.609518\",\"averageRssiDb\":\"-79.780964\",\"sampleSizeRSSI\":\"66763\",\"downloadSpeed\":\"1151.8026\",\"uploadSpeed\":\"1057.0612\",\"pingTime\":\"369.2333\",\"reliability\":\"0.85291039\"}},\"network51089\":{\"type3G\":{\"networkName\":\"3\",\"networkId\":\"51089\",\"networkType\":\"3\",\"averageRssiAsu\":\"16.273417\",\"averageRssiDb\":\"-80.453166\",\"sampleSizeRSSI\":\"112431\",\"downloadSpeed\":\"1513.9704\",\"uploadSpeed\":\"833.8322\",\"pingTime\":\"345.1519\",\"reliability\":\"0.92987901\"},\"type2G\":{\"networkName\":\"3\",\"networkId\":\"51089\",\"networkType\":\"2\",\"averageRssiAsu\":\"16.875849\",\"averageRssiDb\":\"-79.248301\",\"sampleSizeRSSI\":\"24230\",\"downloadSpeed\":\"521.7619\",\"uploadSpeed\":\"1300.6735\",\"pingTime\":\"486.0690\",\"reliability\":\"0.87643810\"}},\"network51008\":{\"type3G\":{\"networkName\":\"AXIS\",\"networkId\":\"51008\",\"networkType\":\"3\",\"averageRssiAsu\":\"16.322777\",\"averageRssiDb\":\"-80.354445\",\"sampleSizeRSSI\":\"61041\",\"downloadSpeed\":\"752.1508\",\"uploadSpeed\":\"478.3811\",\"pingTime\":\"330.9553\",\"reliability\":\"0.92069027\"},\"type2G\":{\"networkName\":\"AXIS\",\"networkId\":\"51008\",\"networkType\":\"2\",\"averageRssiAsu\":\"16.207936\",\"averageRssiDb\":\"-80.584129\",\"sampleSizeRSSI\":\"27575\",\"downloadSpeed\":\"278.1250\",\"uploadSpeed\":\"1608.8857\",\"pingTime\":\"493.1944\",\"reliability\":\"0.83154490\"}},\"network51028\":{\"type3G\":{\"networkName\":\"smartfren\",\"networkId\":\"51028\",\"networkType\":\"3\",\"averageRssiAsu\":\"18.370464\",\"averageRssiDb\":\"-76.259072\",\"sampleSizeRSSI\":\"42459\",\"downloadSpeed\":\"366.4468\",\"uploadSpeed\":\"711.1730\",\"pingTime\":\"299.7977\",\"reliability\":\"0.92553935\"},\"type2G\":{\"networkName\":\"smartfren\",\"networkId\":\"51028\",\"networkType\":\"2\",\"averageRssiAsu\":\"15.573028\",\"averageRssiDb\":\"-81.853945\",\"sampleSizeRSSI\":\"1580\"}}}}";
+	//	processNetworks(data);
+		try {
+			Properties properties = new Properties();
+			properties.load(new FileReader(new File("properties/opensignal.properties")));
+			apiID = properties.getProperty("apikey");
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+	}
+	
+	private void doFetch() {
+		initWriters();
+		loadParameters();
+	//	loadNetworksFromFile();
+		
+		// go through list of input values and fetch one by one
+		for (String [] params : inputCoordinates) {
+			
+		//	String outputPartOne = Utils.joinStringFromArray(new ArrayList<String>(Arrays.asList(params)), "~");
+			
+			String subarray [] = Arrays.copyOfRange(params, 0, 6);
+			String partOne = Utils.joinStringFromArray(new ArrayList<String>(Arrays.asList(subarray)), ",");
+			writeText(partOne + ",");
+			
+			System.out.print(recordCount++ + ". " + partOne + "...");
+			
+			String data = fetchData(params);
+			processNetworks(data);
+			
+			System.out.println(data);
+						
+			try {
+				Thread.sleep(15000);
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+			
+		}
+	}
+	
+	private void doProccesningFromFile() {
+		initWriters();
+		loadNetworksFromFile();
+		
+		allKeysPerNetwork.put("2", new HashSet<String>());
+		allKeysPerNetwork.put("3", new HashSet<String>());
+		allKeysPerNetwork.put("4", new HashSet<String>());
+		
+		// go through list of input values and fetch one by one
+		for (String [] params : inputCoordinates) {
+			
+			String data = params[6];
+			String subarray [] = Arrays.copyOfRange(params, 0, 6);
+			
+			writeText(Utils.joinStringFromArray(new ArrayList<String>(Arrays.asList(subarray)), ",") + ",");
+			
+			processNetworks(data);				
+		}
+		
+		System.out.println();
+	}
+	
+	
+	
+	private void processNetworks(String data) {
+		try {
+			JSONObject obj = new JSONObject(data);
+			JSONObject n = obj.getJSONObject("networkRank");
+			System.out.println(n.toString(2));
+			String [] operators = JSONObject.getNames(n);
+			
+			for (String op: operators) {
+				JSONObject operator = n.getJSONObject(op);
+				
+				writeOperator(op, operator);
+			}
+			
+			writeLine("");
+
+		} catch (Exception e) {
+		//	e.printStackTrace();
+			writeLine("");
+			System.out.println("no results");
+		}		
+	}
+
+	private String fetchData(String[] params) {
+		try {
+			URL url = new URL("http://api.opensignal.com/v2/networkrank.json?lat="+params[3]+"&lng="+params[4]+"&distance="+params[5]+"&network_type=&apikey=" + apiID);
+			BufferedReader in = new BufferedReader(new InputStreamReader(url.openStream()));
+			
+			String line = null;
+			StringBuilder sb = new StringBuilder();
+			
+			while ((line = in.readLine()) != null) {
+				sb.append(line);				
+			}
+			
+			in.close();
+			return sb.toString();
+			
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+		return null;
+	}
+
+	private void loadParameters() {
+		inputCoordinates = new ArrayList<String[]>();
+		try {
+			ArrayList<String> urls = new ArrayList<String>();
+			BufferedReader in = new BufferedReader(new FileReader("input.txt"));
+			String line = null;
+			
+			while ((line = in.readLine()) != null) {
+				String parts [] = line.split("\t");
+				inputCoordinates.add(parts);
+			}
+			
+			in.close();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}	
+		
+	}
+	
+	private void loadNetworksFromFile() {
+		inputCoordinates = new ArrayList<String[]>();
+		try {			
+			BufferedReader in = new BufferedReader(new FileReader("input.txt"));
+			String line = null;
+			
+			while ((line = in.readLine()) != null) {
+				String parts [] = line.split("~");
+				inputCoordinates.add(parts);
+			}
+			
+			in.close();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}	
+		
+	}
+
+	private void writeOperator(String operatorName, JSONObject operator) {
+	//	System.out.println(operator.toString());
+		
+		String [] networks = JSONObject.getNames(operator);
+		
+		for (String net : networks) {
+			try {
+				JSONObject network = operator.getJSONObject(net);
+				HashMap<String, String> nameValues = getNetworkValues(network);
+				
+				for (String key : keys) {
+					String value = nameValues.get(key);
+					if (value == null) {
+						writeText(",");
+					} else {
+						writeText(value + ",");
+					}
+				}
+				
+			} catch (Exception e) {
+				e.printStackTrace();
+			}		
+			
+		}
+		
+	}
+
+
+
+	private HashMap<String, String> getNetworkValues(JSONObject network) {
+		HashMap<String, String> map = new HashMap<String, String>();
+		
+		String [] keys = JSONObject.getNames(network);
+		
+		for (String key : keys) {
+			
+			
+			try {
+				String value = network.getString(key);
+				map.put(key, value);				
+			//	allKeysPerNetwork.get(network.getString("networkType")).add(key);
+			} catch (Exception e) {
+				e.printStackTrace();
+			}		
+			
+		}
+		
+		return map;
+	}
+
+
+
+	private void readDataFromFile() {
+		inputCoordinates = new ArrayList<String[]>();
+		try {
+			ArrayList<String> urls = new ArrayList<String>();
+			BufferedReader in = new BufferedReader(new FileReader("input.txt"));
+			String line = null;
+			
+			while ((line = in.readLine()) != null) {
+				String parts [] = line.split("\t");
+				inputCoordinates.add(parts);
+			}
+			
+			in.close();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}		
+		
+	}
+	
+	private void initWriters() {
+		
+		try {
+			out = new BufferedWriter(new OutputStreamWriter(new FileOutputStream("output.csv"), "UTF-8"));
+			out.write("Country,City,SA3 Code,lat,lng,distance,");
+			
+			for (int i = 1; i <= 30; i++) {
+				for (String title : keys) {
+					out.write(title + "_" + i + ",");
+				}
+			}
+			
+			out.newLine();
+			out.flush();
+		}catch(Exception e) {
+			e.printStackTrace();
+		}
+	}
+	
+	private void writeText(String text) {
+		
+		try {
+			out.write(text);			
+			out.flush();
+		}catch(Exception e) {
+			e.printStackTrace();
+		}	
+	}
+	
+	private void writeLine(String text) {
+		
+		try {
+			out.write(text);
+			out.newLine();
+			out.flush();
+		}catch(Exception e) {
+			e.printStackTrace();
+		}	
+	}
+
+
+
+	public static void main(String[] args) {
+		OpenSignal os = new OpenSignal();
+		os.doFetch();
+	}
+
+}

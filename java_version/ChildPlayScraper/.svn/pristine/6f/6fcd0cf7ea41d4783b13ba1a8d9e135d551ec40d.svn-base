@@ -1,0 +1,77 @@
+package bots;
+
+import master.Master;
+import util.*;
+import java.util.regex.Pattern;
+import java.util.*;
+
+import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.methods.PostMethod;
+
+public class Freecarrierlookup extends Master {
+
+	public Freecarrierlookup(Integer firstPage, Integer lastPage) {		
+		this();
+		firstPageNumber = firstPage;
+		lastPageNumber = lastPage;
+	}
+	
+	private ArrayList<String> phoneList;
+	private Pattern carrierP = Pattern.compile(">Carrier: </font></td><td style=\"text-align:left\">(.+?)<");
+	
+	public Freecarrierlookup() {		
+		phoneList = Files.loadListFromFile("phones.txt");
+		httpClient = new HttpClient();
+		
+		while (true) {
+		for (String phone : phoneList) {
+			PostMethod post = new PostMethod("http://www.freecarrierlookup.com/getcarrier.php");
+			
+			post.setRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:37.0) Gecko/20100101 Firefox/37.0");
+			post.setRequestHeader("Host", "www.freecarrierlookup.com");
+			post.setRequestHeader("Cookie", "_ga=GA1.2.1623435108.1433069327; _gat=1");
+			post.setRequestHeader("Accept-Encoding", "gzip, deflate");
+			post.setRequestHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+			post.setRequestHeader("Connection", "keep-alive");	
+			post.setRequestHeader("Referer", "http://www.freecarrierlookup.com/");
+			post.setRequestHeader("Pragma", "no-cache");
+			
+			post.setParameter("cc", "1");
+			post.setParameter("phonenum", phone);
+			
+			try {
+				httpClient.executeMethod(post);
+				String html = getDataFromStream(post.getResponseBodyAsStream(), false);
+				String carrier = findInString(html, carrierP);
+				System.out.println(phone + " -> " + carrier);
+			} catch (Exception e) {
+				// TODO: handle exception
+			}
+			
+			sleep(400);
+		}
+		}
+	}	
+
+	public static void main(String[] args) {
+		if (args.length == 2) {
+			new Freecarrierlookup(Integer.parseInt(args[0]), Integer.parseInt(args[1])).start();
+		} else {
+			new Freecarrierlookup().start();
+		}
+		
+	}
+
+	@Override
+	public void run() {
+		
+	}
+	
+	@Override
+	public void write (String data) {
+		
+	}
+	
+}
+
+

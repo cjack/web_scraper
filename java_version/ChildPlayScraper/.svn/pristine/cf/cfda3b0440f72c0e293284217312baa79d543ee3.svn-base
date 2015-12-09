@@ -1,0 +1,275 @@
+package bots.australia_jarris;
+
+import master.Master;
+import util.*;
+
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.io.InputStreamReader;
+import java.net.URLEncoder;
+import java.text.SimpleDateFormat;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.zip.GZIPInputStream;
+import java.util.*;
+
+import org.apache.commons.httpclient.Header;
+import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.HttpStatus;
+import org.apache.commons.httpclient.NameValuePair;
+import org.apache.commons.httpclient.methods.GetMethod;
+import org.apache.commons.httpclient.methods.PostMethod;
+
+public class Magistratesvic extends Master {
+
+	private String date = "";
+	
+//	Pattern divWrap = Pattern.compile("<div class=\"searchCasesResult\">(.+?)</div>", Pattern.DOTALL);
+	Pattern trWrap = Pattern.compile("\\{\"CaseID\"(.+?)\\}", Pattern.DOTALL);
+	Pattern tdPattern = Pattern.compile("<td>\\s*(.*?)\\s*</td>", Pattern.DOTALL);
+	
+	private SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy hh:mm");
+	
+	public Magistratesvic() {		
+		
+		Properties p = new Properties();
+				
+		try {
+			p.load(new FileReader("properties/properties.txt"));
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+		date = p.getProperty("date");
+		
+		firstPageNumber = 1;
+		pageIncrement = 1;
+		paginationPattern = Pattern.compile("\"Data\":\\[\\]");
+		
+		writter = new Writter("magistratesvic_out_"+date.replace("/", "_")+".csv");
+		writter.writeLine("Case ID,Informant / Applicant,Defendant/Accused/Respondent,Location,Hearing Date,Informant Station");
+		
+		pProc = new PatternProcessor();
+		
+		pProc.addPattern(1, Pattern.compile("CourtLinkCaseNo\":\"(.*?)\""));
+		pProc.addPattern(2, Pattern.compile("PlaintiffInformantApplicant\":\"(.*?)\""));
+		pProc.addReplacement(2, "\\\\u0027", "'");
+		pProc.addPattern(3, Pattern.compile("DefendantAccusedRespondent\":\"(.*?)\""));
+		pProc.addReplacement(3, "\\\\u0027", "'");
+		pProc.addPattern(4, Pattern.compile("Court\":\"(.*?)\""));	
+		pProc.addReplacement(4, "\\\\u0027", "'");
+		pProc.addReplacement(4, "’", "'");
+		pProc.addPattern(6, Pattern.compile("InformantDivision\":\"(.*?)\""));	
+		pProc.addReplacement(6, "\\\\u0027", "'");
+		
+	}	
+
+	public static void main(String[] args) {		
+		new Magistratesvic().start();		
+	}
+
+	@Override
+	public void run() {
+		String pageHtml = fetchPageContent("http://magistratesvic.com.au/EFAS/CaseSearch");
+		
+	//	String viewstate = findInString(pageHtml, Pattern.compile("id=\"__VIEWSTATE\" value=\"(.+?)\""));		
+		
+		pageNumberParam = "page";
+	//	pageNumberValuePartOne = "ctl00$ctl00$ctl00$ContentPlaceHolderDefault$master_mainContentPlaceHolder$ctl00$PublicUserSearchCasesControl_6$dpCases$ctl01$ctl00";							      
+		
+		postPageURL = "http://magistratesvic.com.au/EFAS/CaseSearch_GridData";
+		postMethodParams = new HashMap<String, String>();
+		postMethodParams.put("HearingDate", date);
+		
+		ArrayList<String> params = Files.loadListFromFile("properties/magistratesvic_props.txt");
+		for (String param : params) {
+			String parts [] = param.split("=");
+			
+			if (parts.length == 2) {
+				postMethodParams.put(parts[0], parts[1]);
+			} else {
+				postMethodParams.put(parts[0], "");
+			}
+			
+		}
+
+	//	postMethodParams.put("__VIEWSTATE", viewstate);
+	//	postMethodParams.put("ctl00$ctl00$ctl00$ContentPlaceHolderDefault$master_mainContentPlaceHolder$ctl00$PublicUserSearchCasesControl_6$txtDate", this.date);
+				
+	//	pageHtml = getHtmlByPost();
+		
+	//	viewstate = findInString(pageHtml, Pattern.compile("id=\"__VIEWSTATE\" value=\"(.+?)\""));	
+		
+	//	postMethodParams.clear();
+		
+	//	postMethodParams.put("__VIEWSTATE", viewstate);
+	//	postMethodParams.put("ctl00$ctl00$ctl00$ContentPlaceHolderDefault$master_mainContentPlaceHolder$ctl00$PublicUserSearchCasesControl_6$txtDate", this.date);
+	//	postMethodParams.put("ctl00$ctl00$ctl00$ContentPlaceHolderDefault$master_mainContentPlaceHolder$ctl00$PublicUserSearchCasesControl_6$hdnCaseDate", this.date);
+		
+//		params = Files.loadListFromFile("properties/magistratesvic1_props.txt");
+//		for (String param : params) {
+//			String parts [] = param.split("=");
+//			
+//			if (parts.length == 2) {
+//				postMethodParams.put(parts[0], parts[1]);
+//			} else {
+//				postMethodParams.put(parts[0], "");
+//			}
+//			
+//		}
+		
+	//	System.out.println(pageHtml);
+	//	write(pageHtml);
+		
+		
+		postMethodProcessing();
+		
+		System.out.println("magistratesvic.com.au scrape FINISHED");
+		
+	}
+	
+	Pattern detailsPattern = Pattern.compile("<a href=\"(/cerca/Pagine/SearchDetailResult.aspx.+?)\">");
+	HashSet<String> compaies = new HashSet<>();
+	
+	protected void postMethodProcessing() {
+		String pageHtml = null;
+
+		for (int i = firstPageNumber; i <= lastPageNumber; i += pageIncrement) {
+			postMethodParams.put(pageNumberParam, Integer.toString(i));
+			System.out.println("Processing page " + i + " on magistratesvic.com.au");
+			
+			pageHtml = getHtmlByPost();
+		//	System.out.println(pageHtml);			
+
+			if (pageHtml != null) {
+				write(pageHtml);
+				
+				Matcher paginationMatcher = paginationPattern.matcher(pageHtml);
+				if (paginationMatcher.find()) {
+					break;					
+				}				
+			} else {
+				sleep(3000);
+				i--;
+				errorCount++;	
+				continue;							
+			}
+			
+			sleep(3000);
+		}
+	}
+	
+	public String fetchPageContent(String fromPage) {
+		try {
+			if (httpClient == null) {
+				httpClient = new HttpClient();
+			}
+			
+			GetMethod get = new GetMethod(fromPage);
+			httpClient.executeMethod(get);
+			
+			StringBuilder sb = new StringBuilder();
+			String line;
+			BufferedReader in = new BufferedReader(new InputStreamReader(get.getResponseBodyAsStream()));
+			while ((line = in.readLine()) != null) {
+				sb.append(line).append("\n");
+			}
+			
+//			for (Header h : get.getResponseHeaders()) {
+//				System.out.println(h.getName() + ": " + h.getValue());
+//			}
+			
+			in.close();
+			get.releaseConnection();
+			
+			return sb.toString();			
+		} catch (Exception e) {
+			System.err.println("#### GREŠKA ZA: " + fromPage + " ####");
+			e.printStackTrace();			
+			return null;
+		}
+	}
+	
+	protected String getHtmlByPost() {
+		if (httpClient == null) {
+			httpClient = new HttpClient();
+		}
+		BufferedReader br;
+		StringBuffer html = new StringBuffer();
+		String temp;
+		PostMethod method = new PostMethod(postPageURL);
+
+		
+		method.setRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/34.0.1847.131 Safari/537.36");
+		method.setRequestHeader("Referer", "http://magistratesvic.com.au/EFAS/CaseSearch");
+		method.setRequestHeader("Host", "magistratesvic.com.au");
+		method.setRequestHeader("Accept", "*/*");
+		method.setRequestHeader("Accept-Encoding", "gzip, deflate");
+		method.setRequestHeader("Accept-Language", "sr,sr-rs;q=0.8,sr-cs;q=0.6,en-us;q=0.4,en;q=0.2");
+		method.setRequestHeader("Connection", "keep-alive");
+		method.setRequestHeader("Cookie", "CaseSearchGrid=%7B%22page%22%3A1%2C%22pageSize%22%3A15%2C%22sort%22%3A%5B%7B%22field%22%3A%22CourtLinkCaseNo%22%2C%22dir%22%3A%22desc%22%7D%5D%2C%22group%22%3A%5B%5D%2C%22CaseType%22%3A%22CRI%22%2C%22CourtID%22%3A%22%22%2C%22CourtID_input%22%3A%22%22%2C%22HearingDate%22%3A%2202%2F04%2F2015%22%2C%22CourtLinkCaseNo%22%3A%22%22%2C%22PlaintiffInformantApplicant%22%3A%22%22%2C%22DefendantAccusedRespondent%22%3A%22%22%7D");
+		method.setRequestHeader("X-Requested-With", "XMLHttpRequest");
+		method.setRequestHeader("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8");
+		
+		for (String param : postMethodParams.keySet()) {
+			method.addParameter(param, postMethodParams.get(param));
+		}
+		
+		int length = 0;
+		for (NameValuePair pair : method.getParameters()) {
+			length += (URLEncoder.encode(pair.getName()).length() + URLEncoder.encode(pair.getValue()).length() + 2);
+		}
+		
+		length -= 2;
+		
+		method.setRequestHeader("Content-Length", Integer.toString(length));
+
+		try {
+			int statusCode = httpClient.executeMethod(method);
+			
+//			for (Header h : method.getRequestHeaders()) {
+//				System.out.println(h.getName() + ": " + h.getValue());
+//			}
+			
+			if (statusCode == HttpStatus.SC_OK) {
+				br = new BufferedReader(new InputStreamReader(method.getResponseBodyAsStream(), charset));
+				while ((temp = br.readLine()) != null) {
+					html.append(temp).append("\n");
+				}
+
+				br.close();
+				
+				String pageHtml = html.toString();
+				
+				return pageHtml;
+			} else {
+				return null;
+			}
+		} catch (Exception e) {
+			System.err.println("#### GREŠKA ZA: " + postPageURL + " ####");
+			e.printStackTrace();			
+			return null;
+		}
+	}
+	
+	private Pattern datePattern = Pattern.compile("Date\\((.*?)\\)");
+	
+	@Override
+	public void write (String data) {
+	//	String tableWrap = findInString(data, divWrap);
+		ArrayList<String> trWrapData = findAllInString(data, trWrap);
+		
+		for (int j = 0; j < trWrapData.size(); j++) {
+			String date = findInString(trWrapData.get(j), datePattern);
+			
+			String processedDate = sdf.format(new Date(Long.parseLong(date)));
+			
+			pProc.addData(5, processedDate);
+			
+			pProc.processPatterns(trWrapData.get(j), writter);
+		}
+	}
+	
+}
+
+

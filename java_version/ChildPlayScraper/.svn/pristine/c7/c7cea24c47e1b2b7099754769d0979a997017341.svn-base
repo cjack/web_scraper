@@ -1,0 +1,600 @@
+package bots;
+
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.regex.Pattern;
+import java.util.zip.GZIPInputStream;
+
+import javax.swing.JButton;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JScrollPane;
+import javax.swing.JTextArea;
+import javax.swing.JTextField;
+import javax.swing.ScrollPaneConstants;
+
+import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.methods.GetMethod;
+import org.apache.commons.httpclient.methods.PostMethod;
+
+import util.PatternProcessor;
+import util.Patterns;
+import util.Writter;
+
+public class Thuisbezorgd extends Thread{
+	
+	private HttpClient httpClient;
+	private JFrame frame;
+	private static JButton startScrapeBtn;
+	private PatternProcessor pProc;
+	private JTextField textField;
+	private JTextArea textArea;
+	
+	private int currentChar = 97;
+	private int charCount = 1;
+	private String thePostCode = "";
+	private HashMap<String, String> setTypes = new HashMap<String, String>();
+	private HashMap<String, String> setTitles = new HashMap<String, String>();
+	private HashMap<String, String> setValues = new HashMap<String, String>();
+//	private HashMap<String, String> setValuesForCheck = new HashMap<String, String>();
+	
+	private HashMap<String, String> categoryDescriptions = new HashMap<String, String>();
+	
+	public Thuisbezorgd() {		
+		try {					    
+		    frame = new JFrame("Scrapper");		    
+		    frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+		    frame.setLayout(null);
+		    frame.setSize(600, 360);
+		    frame.setLocationRelativeTo(null);
+		    
+		    JLabel labelCaptcha = new JLabel("Enter url");
+		    labelCaptcha.setLocation(20, 20);
+		    labelCaptcha.setSize(100, 25);
+		    
+		    textField = new JTextField();
+		    textField.setLocation(100, 20);
+		    textField.setSize(470, 25);
+		    
+		    JLabel labelDate = new JLabel("Enter date");
+		    labelDate.setLocation(200, 180);
+		    labelDate.setSize(100, 25);
+		    
+		    textArea = new JTextArea();
+			textArea.setSize(460, 400);
+			textArea.setLocation(20, 110);
+			
+			JScrollPane scroll = new JScrollPane(textArea);
+			scroll.setSize(550, 190);
+			scroll.setLocation(20, 110);
+			
+	        scroll.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS);
+	        
+	        startScrapeBtn = new JButton("Start scrape");
+			startScrapeBtn.setSize(150, 30);
+			startScrapeBtn.setLocation(225, 60);
+			startScrapeBtn.addActionListener(new ActionListener() {			   
+				@Override
+				public void actionPerformed(ActionEvent arg0) {
+					startScrapeBtn.setEnabled(false);
+					writeOutput("Working...");
+					start();					
+				}
+				
+			});
+		    
+		    frame.add(labelCaptcha);
+		    frame.add(textField);
+		    frame.add(startScrapeBtn);
+		    frame.add(scroll);
+		    
+		    frame.setVisible(true);
+		    
+
+			
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}	
+
+	public static void main(String[] args) {
+		new Thuisbezorgd();		
+		
+	}
+	
+	private Pattern categoryPatern = Pattern.compile("<span class=\"menucategorytitle\">(.+?)<(.+?)(?:class=\"menucardcategorycontainer\">|<script type=\"application/ld\\+json\">)", Pattern.DOTALL);
+	private Pattern catDescPattern = Pattern.compile("<p class=\"menucardcategory\">(.*?)<");
+	private Pattern produstWrapPatern = Pattern.compile("<div class=\"menucardproduct\".+?>(.+?)</form>", Pattern.DOTALL);
+	private Pattern namePattern = Pattern.compile("itemprop=\"name\">(.+?)<");
+	private Pattern descPattern = Pattern.compile("itemprop=\"description\">(.*?)</p");
+	private Pattern desc2Pattern = Pattern.compile("<p class=\"productextradescription\">(.*?)</p");
+	private Pattern pricePattern = Pattern.compile("itemprop=\"price\"\\s+content=\"€\\s+(.+?)\"/>");
+	private Pattern imagePattern = Pattern.compile("(static\\.thuisbezorgd\\.nl/images/.+?/products/.+?)\"");
+	private Pattern imageNamePattern = Pattern.compile("products/(.+)");
+	private Pattern imageNamePatternForFile = Pattern.compile("products/(.+?)\\.");
+	
+	private Pattern sideDishPattern = Pattern.compile("grid-12\">(.+?)<div class=\"(?:checkboxgroup|sidedishpulldown |sidedishnumber)", Pattern.DOTALL);
+	private Pattern sideDishTitlePattern = Pattern.compile("<h3>(.+?)\\s*:");
+	
+	private Writter optionsWriter;
+		
+	private int productNum = 1;
+	private int optionsNum = 1;
+	
+	public void run () {
+		String url = textField.getText().trim();
+		
+		writeZipCodes(url);		
+		purgeDirectory(new File("gerechten"));
+		
+		Writter writer = new Writter("menu.csv");
+		optionsWriter = new Writter("options.csv");
+		
+		
+	//	writer.writeLine("id,,,name dish,description,price,under,,photo,,,category");
+		pProc = new PatternProcessor();
+		pProc.addData(2, "");
+		pProc.addData(3, "");
+	//	pProc.addData(8, "");
+		pProc.addData(10, "");
+		pProc.addData(11, "6");
+		
+		String pageHtml = fetchPageContent(url);
+//		Writter htmlW = new Writter("lastHtml.html");
+//		htmlW.write(pageHtml);
+//		htmlW.close();
+				
+		ArrayList<String[]> categoriesData = Patterns.findAllGroupsInString(pageHtml, categoryPatern);
+		
+		for (String categoryData [] : categoriesData) {
+			if (categoryData[0].equals("Populaire gerechten")) continue;
+			
+		//	if (categoryData[0].equals("Menu's")) continue;
+			
+			pProc.addData(12, categoryData[0]);
+			
+		//	System.out.println(categoryData[1]);
+			String catDesc = Patterns.findInString(categoryData[1], catDescPattern);
+			categoryDescriptions.put(categoryData[0], catDesc);
+						
+			ArrayList<String> productsHtmls = Patterns.findAllInString(categoryData[1], produstWrapPatern);
+			
+			for (String productHtml : productsHtmls) {
+				pProc.addData(1, Integer.toString(productNum));
+				productNum++;
+				
+			//	System.out.println(productHtml);
+				processProduct(productHtml);
+				
+				String name = Patterns.findInString(productHtml, namePattern);
+				pProc.addData(4, name);
+				
+				writeOutput("Processing " + name);
+				
+				String desc = Patterns.findInString(productHtml, descPattern);
+				pProc.addData(5, desc.trim());
+				
+				String price = Patterns.findInString(productHtml, pricePattern);
+				System.out.println(productHtml);
+				price = price.replaceAll(",", ".");
+			//	System.out.println(price);
+				pProc.addData(6, price);
+				
+				// na 7 idu ove abdeggfh zajebancije
+				
+				String desc2 = Patterns.findInString(productHtml, desc2Pattern).trim();
+				if (desc2.equals("")) {
+					pProc.addData(8, "");
+				} else {
+					pProc.addData(8, "");
+				}
+				
+				String image = Patterns.findInString(productHtml, imagePattern);
+				if (!image.equals("")) {
+					try {
+						saveImage("http://" + image, "gerechten/" + Patterns.findInString(image, imageNamePattern));
+						pProc.addData(9, Patterns.findInString(image, imageNamePatternForFile));
+					} catch (IOException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
+				} else {
+					pProc.addData(9, "");
+				}
+				
+				pProc.processPatterns(productHtml, writer);
+			}
+			
+		//	break;
+		}
+		
+		optionsWriter.close();
+		writer.close();
+		writeConfigFile();
+		
+		writeOutput("DONE");
+		writeOutput("Check menu.csv file");
+	}
+	
+	private void purgeDirectory(File dir) {
+	    for (File file: dir.listFiles()) {
+	        if (file.isDirectory()) purgeDirectory(file);
+	        file.delete();
+	    }
+	}
+	
+	private void writeConfigFile() {
+		Writter configWriter = new Writter("config.txt");
+		Writter csvConfigWriter = new Writter("menu_config.csv");
+		Writter optionsConfigWriter = new Writter("options_config.csv");
+		
+		configWriter.writeLine("<?php");
+		configWriter.writeLine("");
+		configWriter.writeLine("//index.php");
+		configWriter.writeLine("//gerechten binnen categorie sorteren. 1=op nummer, 2=niet sorteren (volgorde db aanhouden), 3=op laagste prijs");
+		configWriter.writeLine("$sort_gerechten[\"sorteren\"] = \"1\";");
+		configWriter.writeLine("");
+		configWriter.writeLine("//types extra opties");
+		configWriter.writeLine("//1 is dropdown, 2 is checkboxes");
+		
+		int code = 97;
+		int chCount = 1;
+		
+		while (true) {
+			String currChar = Character.toString((char)code);
+			String key = "";
+			for (int i = 0; i < chCount; i++) {
+				key += currChar;
+			}
+			
+			if (setTypes.containsKey(key)) {
+				configWriter.writeLine("$setid_type[\""+key+"\"] = \""+setTypes.get(key)+"\";");
+			} else {
+				break;
+			}
+			code++;
+			
+			if (code > 122) {
+				code = 97;
+				chCount++;
+			}
+		}
+		
+		configWriter.writeLine("");
+		code = 97;
+		chCount = 1;
+		
+		while (true) {
+			String currChar = Character.toString((char)code);
+			String key = "";
+			for (int i = 0; i < chCount; i++) {
+				key += currChar;
+			}
+			
+			if (setTitles.containsKey(key)) {
+				configWriter.writeLine("$setid_titel[\""+key+"\"] = \""+setTitles.get(key)+"\";");
+				optionsConfigWriter.writeLine("\"" + key + "\",\"" + setTypes.get(key) + "\",\"" + setTitles.get(key) + "\"");
+			} else {
+				break;
+			}
+			code++;
+			
+			if (code > 122) {
+				code = 97;
+				chCount++;
+			}
+		}
+		
+		configWriter.writeLine("");
+		
+		for (String key : categoryDescriptions.keySet()) {
+			if(!categoryDescriptions.get(key).trim().equals("")) {
+				configWriter.writeLine("$h4_ondertitel[\""+key+"\"] = \""+categoryDescriptions.get(key)+"\";");
+				csvConfigWriter.writeLine("\"" + key + "\",\"" + categoryDescriptions.get(key) + "\"");
+			}			
+		}		
+		
+		configWriter.writeLine("");
+		configWriter.writeLine("//settings m.b.t. bestelling.php");
+		configWriter.writeLine("//0 = nee, 1 = ja");
+		configWriter.writeLine("$bestel_opties[\"pinnen_aan_deur\"] = \"0\";");
+		configWriter.writeLine("$bestel_opties[\"afhalen\"] = \"1\";");
+		configWriter.writeLine("?>");
+		
+		optionsConfigWriter.close();
+		csvConfigWriter.close();
+		configWriter.close();
+	}
+
+	private Pattern hiddenPattern = Pattern.compile("<input type=\"hidden\"\\s+name=\"(.+?)\"\\s+value=\"(.+?)\"/>");
+	
+	private void processProduct(String html) {
+		
+		ArrayList<String[]> allHiddenFields = Patterns.findAllGroupsInString(html, hiddenPattern);
+		
+		PostMethod post = new PostMethod("http://www.thuisbezorgd.nl/showSidedishes.php");
+		
+		for (String [] hiddenField : allHiddenFields) {
+			post.setParameter(hiddenField[0], hiddenField[1]);
+		}
+		
+		post.setRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:35.0) Gecko/20100101 Firefox/35.0");
+		post.setRequestHeader("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8");
+		
+		try {
+			httpClient.executeMethod(post);
+			processSideDishes(getDataFromStream(post.getResponseBodyAsStream(), false));		
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+	
+	private Pattern optionPattern = Pattern.compile("class=\"pulldown\">(.+?)<");
+	private Pattern optionPricePattern = Pattern.compile("€\\s+(.+?)\\)");
+	private Pattern optionNamePattern = Pattern.compile("(.+?)\\s*\\(\\+");
+	
+	private Pattern checkBoxPattern = Pattern.compile("class=\"sidedishcheckbox\"(.+?</label>)\\s+</div>", Pattern.DOTALL);
+	private Pattern checkBoxPricePattern = Pattern.compile("changeTotalSidedishPriceCheckbox\\((.+?),");
+	private Pattern checkBoxNamePattern = Pattern.compile("class=\"checkbox_form_label\".+?>(.+?)<");
+	
+	private void processSideDishes(String sideDishHtml) {
+		pProc.addData(7, "");
+	//	System.out.println(sideDishHtml);
+		
+		HashSet<String> hashSet = new HashSet<String>();
+		
+		StringBuilder setsForThisDish = new StringBuilder();
+		ArrayList<String> groups = Patterns.findAllInString(sideDishHtml, sideDishPattern);
+		StringBuilder hashString = null;
+		StringBuilder optionsString = null;
+		String setType = "1";
+		
+		for (String group : groups) {
+			String title = Patterns.findInString(group, sideDishTitlePattern);
+			
+			hashString = new StringBuilder(); 
+			optionsString = new StringBuilder();
+			hashString.append(title).append("~");
+			ArrayList<String> groupValues = new ArrayList<String>();
+			
+			
+			// ako je dropdown lista
+			if (group.contains("<div class=\"sidedishpulldown\">")) {				
+				
+				ArrayList<String> options = Patterns.findAllInString(group, optionPattern);
+				
+				for (String option : options) {
+					option = option.trim().replaceAll("\\s+", " ");	
+					option = option.replaceAll("\\&#039;", "'");
+					option = option.replaceAll("\\&amp;", "&");
+					
+					groupValues.add(option);
+					optionsString.append(option).append("~");
+				}
+				
+				setType = "1";
+				
+			} else if (group.contains("class=\"sidedishcheckbox\"")) { // onda su checkboxovi
+				ArrayList<String> checkBoxes = Patterns.findAllInString(group, checkBoxPattern);
+				
+				for (String checkBox : checkBoxes) {
+					String cbName = Patterns.findInString(checkBox, checkBoxNamePattern);				
+				//	String cbPrice = Patterns.findInString(checkBox, checkBoxPricePattern);
+					cbName = cbName.trim().replaceAll("\\s+", " ");
+					cbName = cbName.replaceAll("\\&#039;", "'");
+					cbName = cbName.replaceAll("\\&amp;", "&");
+					
+					groupValues.add(cbName);
+					optionsString.append(cbName).append("~");
+				}	
+				
+				setType = "2";
+			}
+			
+		//	Collections.sort(groupValues);
+			for (String val : groupValues) {
+				hashString.append(val).append("~");
+			}
+			
+			if (setValues.containsKey(hashString.toString())) {
+				if (hashSet.contains(hashString.toString())) {
+					String currChar = Character.toString((char)currentChar);
+					String setChar = "";
+					for (int i = 0; i < charCount; i++) {
+						setChar += currChar;
+					}
+					
+					setValues.put(hashString.toString(), setChar);
+				//	setValuesForCheck.put(hashString.toString(), setChar);
+					
+					setTitles.put(setChar, title);
+					setTypes.put(setChar, setType);						
+					
+					writeOptionsToFile(setChar, hashString.toString(), optionsString.toString());
+					
+					currentChar++;
+					if (currentChar > 122) {
+						currentChar = 97;
+						charCount++;
+					}
+				}
+			} else {
+				String currChar = Character.toString((char)currentChar);
+				String setChar = "";
+				for (int i = 0; i < charCount; i++) {
+					setChar += currChar;
+				}
+				
+				setValues.put(hashString.toString(), setChar);
+			//	setValuesForCheck.put(hashString.toString().toLowerCase(), setChar);
+				
+				setTitles.put(setChar, title);
+				setTypes.put(setChar, setType);	
+				hashSet.add(hashString.toString());
+				
+				writeOptionsToFile(setChar, hashString.toString(), optionsString.toString());
+				
+				currentChar++;
+				if (currentChar > 122) {
+					currentChar = 97;
+					charCount++;
+				}
+			}
+			
+			setsForThisDish.append(setValues.get(hashString.toString())).append(",");				
+		}
+		
+		if (setsForThisDish.length() > 0) {
+			setsForThisDish.deleteCharAt(setsForThisDish.length()-1);
+		}			
+		
+		pProc.addData(7, setsForThisDish.toString());
+		
+	}
+	
+	private void writeOptionsToFile(String letter, String hash, String string) {
+		// ispisivanje u options.csv
+		String [] parts = hash.split("~");
+		for (int i = 0; i < parts.length; i++) {
+			if (i == 0) {
+				continue;
+			}
+			
+			String price = "0";
+			String name = parts[i];
+			if (parts[i].contains("€")) {					
+				price = Patterns.findInString(parts[i], optionPricePattern);
+				name = Patterns.findInString(parts[i], optionNamePattern);
+			} 
+			
+			optionsWriter.writeLine(setValues.get(hash) + "," + optionsNum++ + ",," + name + "," + price.replace(",", ".") + ",0");
+			
+		}
+	}
+
+	private Pattern postCodePattern = Pattern.compile("<a class=\"smalllink\" title.+?>(\\d{4})\\s");
+	
+	private void writeZipCodes(String url) {
+		String restaurantName = url.substring(url.lastIndexOf("/")+1);
+		
+		String pageHtml = fetchPageContent("http://www.thuisbezorgd.nl/meer-informatie-over-" + restaurantName);
+		
+		ArrayList<String> zipCodes = Patterns.findAllInString(pageHtml, postCodePattern);
+		
+		thePostCode = zipCodes.get(0);
+		
+		HashSet<String> distinctZC = new HashSet<String>();
+		
+		distinctZC.addAll(zipCodes);
+		zipCodes.clear();
+		zipCodes.addAll(distinctZC);
+		
+		Collections.sort(zipCodes);
+		
+		Writter zcodew = new Writter("postcodes.csv");
+		
+		int counter = 1;
+		
+		for (String code : zipCodes) {
+			zcodew.writeLine(counter++ + "," + code + ",0,0,0,1");
+		}
+		
+		zcodew.close();
+		
+	}
+
+	public static void saveImage(String imageUrl, String destinationFile) throws IOException {
+		URL url = new URL(imageUrl);
+		java.net.URLConnection c = url.openConnection();
+		c.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:35.0) Gecko/20100101 Firefox/35.0");
+		
+		File f = new File(destinationFile);
+		if (f.exists()) return;
+		
+		InputStream is = c.getInputStream();
+		OutputStream os = new FileOutputStream(destinationFile);
+
+		byte[] b = new byte[2048];
+		int length;
+
+		while ((length = is.read(b)) != -1) {
+			os.write(b, 0, length);
+		}
+
+		is.close();
+		os.close();
+	}
+	
+	public String fetchPageContent(String fromPage) {
+		try {
+			if (httpClient == null) {
+				httpClient = new HttpClient();
+			}
+			
+			GetMethod get = new GetMethod(fromPage);
+			get.setRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2272.89 Safari/537.36");
+			httpClient.executeMethod(get);
+			
+			StringBuilder sb = new StringBuilder();
+			String line;
+			BufferedReader in = new BufferedReader(new InputStreamReader(get.getResponseBodyAsStream(), "UTF-8"));
+			while ((line = in.readLine()) != null) {
+				sb.append(line).append("\n");
+			}
+			
+			in.close();
+			get.releaseConnection();
+			
+			return sb.toString();			
+		} catch (Exception e) {
+			System.err.println("#### GREŠKA ZA: " + fromPage + " ####");
+			e.printStackTrace();			
+			return null;
+		}
+	}
+	
+	private void writeOutput(String text) {
+		textArea.append(text);
+		textArea.append("\n");
+		textArea.setCaretPosition(textArea.getDocument().getLength());
+	}
+	
+	private String getDataFromStream(InputStream inS, boolean inGZIP) {
+		try {
+			BufferedReader in = null;
+			if (inGZIP) {
+				in = new BufferedReader(new InputStreamReader(new GZIPInputStream(inS), "UTF-8"));
+			} else {
+				in = new BufferedReader(new InputStreamReader(inS, "UTF-8"));
+			}
+			
+			StringBuilder sb = new StringBuilder();
+			String line = null;
+			while ((line = in.readLine()) != null) {
+				sb.append(line).append("\n");
+			}
+			
+			in.close();
+			return sb.toString();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+		return null;
+	}
+	
+}
+
+

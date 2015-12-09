@@ -1,0 +1,84 @@
+package bots;
+
+public class TeamStats {
+	private String name;
+	private int played, won, draw, lost, gf, ga, gd, pts;
+	
+	public TeamStats(String name) {
+		this.name = name;
+		this.won = 0;
+		this.draw = 0;
+		this.lost = 0;
+		this.gf = 0;
+		this.ga = 0;
+		this.gd = 0;
+		this.pts = 0;
+	}
+	
+	public String getName() {
+		return this.name;
+	}
+
+	public int getGA() {
+		return ga;
+	}
+
+	public void addGA(int ga) {
+		this.ga += ga;
+	}
+	
+	public int getGF() {
+		return gf;
+	}
+
+	public void addGF(int gf) {
+		this.gf += gf;
+	}
+
+	public int getGD() {
+		return gf - ga;
+	}
+
+	public int getPts() {
+		return pts;
+	}
+
+	public void addPts(int pts) {
+		this.pts += pts;
+	}
+
+	public int getLost() {
+		return lost;
+	}
+
+	public void addLost(int lost) {
+		this.lost += lost;
+	}
+
+	public int getDraw() {
+		return draw;
+	}
+
+	public void addDraw(int draw) {
+		this.draw += draw;
+	}
+
+	public int getWon() {
+		return won;
+	}
+
+	public void addWon(int won) {
+		this.won += won;
+	}
+
+	public int getPlayed() {
+		return played;
+	}
+
+	public void addPlayed(int played) {
+		this.played += played;
+	}
+
+	
+	
+}

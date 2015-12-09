@@ -1,0 +1,103 @@
+package bots;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.regex.Pattern;
+
+import master.Master;
+import util.*;
+
+public class ACElectro extends Master {
+	
+	private Pattern imagePattern = Pattern.compile("(http://www.ac-electronic.com/images/[vl]/.+?jpg)");
+	
+	private Pattern descPattern = Pattern.compile("<div id=\"tabss0\".+?>\\s+(.+?)\\s+</div>", Pattern.DOTALL);
+	private Pattern specsPattern = Pattern.compile("<div id=\"tabss2\".+?>\\s+(.+?)\\s+</div>", Pattern.DOTALL);
+	private Pattern includePattern = Pattern.compile("<div id=\"tabss1\".+?>\\s+(.+?)\\s+</div>", Pattern.DOTALL);
+	
+	private Pattern soldOutPatt = Pattern.compile("(soldout.gif)");
+
+	public ACElectro() {		
+		detailsPagePattern = Pattern.compile("href=\"(http://www.ac-electronic.com/.+?\\.html)\"\\s+class=\"ih\"");
+		paginationPattern = Pattern.compile("src=\"/images/next0.gif\"");
+		
+		writter = new Writter("ac_electro.csv");
+		writter.writeLine("Category1,Category2,Category3,Category4,Category5,SubCategory,Product Name,ASIN#,Barcode,Price,Manufacturer,Review Score,Reviews#,Amazon Rank,Description,Image1,Image2,Image3,Image4,Image5");
+		pProc = new PatternProcessor();
+		
+		pProc.addPattern(1, Pattern.compile(">Home</a>\\&nbsp;>\\&nbsp;\\s+.+?>(.+?)<"));
+		pProc.addData(2, "");
+		pProc.addData(3, "");
+		pProc.addData(4, "");
+		pProc.addData(5, "");
+		pProc.addPattern(6, Pattern.compile("<span class=\"red\">\\s+(.+?)<"));
+		pProc.addPattern(7, Pattern.compile("color: #000000\">(.+?)<"));
+		pProc.addPattern(8, Pattern.compile(">Model:\\s+(.+?)<"));
+		pProc.addData(9, "");
+		pProc.addPattern(10, Pattern.compile("<span id=\"products_price_unit\".+?>\\s+(.+?)\\s+<"));
+		pProc.addPattern(11, Pattern.compile("<span class=\"red\">\\s+(.+?)<"));
+		pProc.addData(12, "1");
+		pProc.addData(13, "");
+		pProc.addData(14, "");
+		
+	}		
+
+	public static void main(String[] args) {		
+		new ACElectro().start();
+	}
+
+	@Override
+	public void run() {
+		ArrayList<String> catgories = Files.loadListFromFile("categories.txt");
+		
+		firstPageNumber = 1;
+		pageIncrement = 1;
+		
+		for (String category : catgories) {
+			incrementPartOneURL = category + "?page=";
+			
+			typeOneProcessing();
+		}
+		 
+	}
+	
+	@Override
+	public void write (String data) {
+		if (findInString(data, soldOutPatt).length() > 1) {
+			return;
+		}
+		
+		String specs = findInString(data, descPattern) + " " + findInString(data, specsPattern) + " " + findInString(data, includePattern);
+		if (specs.length() > 56000) {
+			specs = specs.substring(0, 56000);
+		}
+		pProc.addData(15, specs);
+		
+		HashSet<String> hash = new HashSet<String>();
+		
+		ArrayList<String> images = findAllInString(data, imagePattern);
+		for (String image : images) {
+			image = image.replaceAll("/l/", "/v/");
+			hash.add(image);
+		}
+		
+		pProc.addData(16, "");
+		pProc.addData(17, "");
+		pProc.addData(18, "");
+		pProc.addData(19, "");
+		pProc.addData(20, "");
+		
+		int nowId = 16;		
+		for (String img : hash) {
+			pProc.addData(nowId++, img);
+			
+			if (nowId == 21) break;
+		}
+		
+		pProc.processPatterns(data, writter);
+	}
+	
+}
+
+

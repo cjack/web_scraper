@@ -1,0 +1,831 @@
+package master;
+
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.sql.Timestamp;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.zip.GZIPInputStream;
+
+import loaders.PropertiesLoader;
+
+import org.apache.commons.httpclient.Cookie;
+import org.apache.commons.httpclient.Header;
+import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.HttpStatus;
+import org.apache.commons.httpclient.cookie.CookiePolicy;
+import org.apache.commons.httpclient.methods.GetMethod;
+import org.apache.commons.httpclient.methods.PostMethod;
+import org.apache.commons.httpclient.params.HttpMethodParams;
+
+//import entities.FoundItem;
+//import entities.SearchResult;
+
+import util.DBWorks;
+import util.PatternProcessor;
+import util.Sha1Hash;
+import util.Writter;
+
+public abstract class Master extends Thread {
+	
+	/**
+	 * Pattern koji se koristi za nalazenje linkova sa detaljnim informacijama o
+	 * automobilu
+	 */
+	protected Pattern detailsPagePattern;
+	
+	protected Pattern paginationPattern;
+	/**
+	 * Prvi staticki deo url-a koji predstavlja stranu na kojoj se nalazi
+	 * odredjeni broj rezultata
+	 */
+	protected String incrementPartOneURL = "";
+	/**
+	 * Drugi staticki deo url-a koji predstavlja stranu na kojoj se nalazi
+	 * odredjeni broj rezultata
+	 */
+	protected String incrementPartTwoURL = "";
+	/**
+	 * Broj prve strane
+	 */
+	protected int firstPageNumber;
+	/**
+	 * Poslednji broj strane
+	 */
+	protected int lastPageNumber = Integer.MAX_VALUE;
+	/**
+	 * Broj za koji se uvecava broj strane
+	 */
+	protected int pageIncrement;
+	/**
+	 * Osnvovni url (http://.+?/). Koristi se za formiranje apsolutnih linkova u
+	 * slucaju da na strani imamo relativne
+	 */
+	protected String baseURL;
+	/**
+	 * U slucaju da se baseURL razlikuje za strane i slike, moze se koristiti
+	 * imageBaseURL
+	 */
+	protected String imageBaseURL;
+	/**
+	 * U slucaju da se na sajtu koristi post metoda, ovo je url strane koja se
+	 * stalno ponavlja
+	 */
+	protected String postPageURL;
+	/**
+	 * U slucaju da auto nema sliku, koristi ste, ako je ima, genericka no-image
+	 * slika sa obradjivanog sajta
+	 */
+	protected String noImageURL;
+	/**
+	 * Parametar (url) kome se dodeljuje broj strane
+	 */
+	protected String pageNumberParam = "";
+	/**
+	 * Prvi deo vrednosti koja se dodeljuje pageNumberParam elementu
+	 */
+	protected String pageNumberValuePartOne = "";
+	/**
+	 * Drugi deo vrednosti koja se dodeljuje pageNumberParam elementu
+	 */
+	protected String pageNumberValuePartTwo = "";
+	/**
+	 * Parametar (url) kome se dodeljuje odredjena vrednost u zavisnosti po kom
+	 * kriterijumu se definise search (make, year i sl.)
+	 */
+	protected String formParam = "";
+	/**
+	 * Vrednost koja se dodeljuje formParam elementu
+	 */
+	protected String formValue = "";
+	/**
+	 * Niz vrednosti za formValue
+	 */
+	protected List<String> formValues;
+	/**
+	 * U slucaju da program radi u offline modu, direktorijum u kom ce se
+	 * upisivati fajlovi sa rezultatima
+	 */
+	protected File rootDir;
+	/**
+	 * Log file
+	 */
+	protected File logFile;
+	/**
+	 * Imena faljova u offline modu (1.bot, 2.bot...) i ujedno ukupan broj
+	 * dovucenih automobila
+	 */
+	protected int recordCount = 0;
+	/**
+	 * Ova promenljiva se samo koristi u online mode-u i predstavlja broj
+	 * novodovucenih automobila
+	 */
+	protected int newRecordsCount = 0;
+	/**
+	 * Ova promenljiva se koristi u online mode-u i predstavlja broj automobila
+	 * koji se jos uvek listaju na odredjenom sajtu, tj. kojima se update-uje
+	 * vreme
+	 */
+	protected int updatedRecordsCount = 0;
+	/**
+	 * Encoding html stranice. Podrazumevana vrednost je utf-8
+	 */
+	protected String charset = "utf-8";
+	/**
+	 * Pauza izmedju dva requesta u milisekundama. Podrazumevana vrednost je 500
+	 * milisekundi
+	 */
+	protected int requestDelay = 500;
+	/**
+	 * Pauza prilikom provere poslednje paginacione strane u milisekundama.
+	 * Podrazumevana vrednost je 5000. Ako se vrednost postavi na nulu, onda
+	 * nece biti provere poslednje strane.
+	 */
+	protected int paginationCheckTime = 1000;
+	/**
+	 * ID sajta koji se obradjuje. Sluzi kao identifikator u bazi.
+	 */
+	protected String webSiteID;
+	/**
+	 * Brojanje uzastopnih gresaka
+	 */
+	protected int errorCount = 0;
+	/**
+	 * Inicijalni vremenski razmak izmedju dovlacenja strane u slucaju da je
+	 * doslo do greske (u milisekundama)
+	 */
+	protected int initialErrorDelay = 5000;
+	/**
+	 * URL paginacione strane
+	 */
+	protected String paginationURL;
+	/**
+	 * URL strane sa informacijama o odredjenom automobilu
+	 */
+	protected String detailsPageURL;
+	/**
+	 * Lista url-ova ka sitemapovima za odredjeni sajt.
+	 */
+	protected ArrayList<String> siteMapURLs;
+	/**
+	 * Ova promenljiva omogucava da se bot predstavi kao firefox. Podrazumevana
+	 * vrednost je false.
+	 */
+	protected boolean firefoxMask = false;
+	/**
+	 * Promenljiva koja nam omogucava koriscenje cookie-ja.
+	 */
+	protected boolean useCookies = false;
+	/**
+	 * Mapa parametara koji ce se koristiti u post metodi.
+	 */
+	protected Map<String, String> postMethodParams;
+	/**
+	 * HttpClient koji se koristi ukoliko se sajt obradjuje post metodom ili ako
+	 * se koriste cookie
+	 */
+	protected HttpClient httpClient;
+	protected boolean stopped = false;
+	/**
+	 * Jedinstveni ID loga u bazi
+	 */
+	private long logID = System.nanoTime();
+	/**
+	 * Konekcija ka bazi
+	 */
+	protected Connection connection;
+	protected Statement statement;
+	protected PreparedStatement preparedStatement;
+	
+	
+	protected PatternProcessor pProc;
+	protected Writter writter;
+
+	public Master() {
+		
+	}
+	
+	public Master(String siteName) {		
+	//	DBWorks.init();
+		
+//		try {
+//			if (connection == null) {
+//				Class.forName("com.mysql.jdbc.Driver");
+//				connection = DriverManager.getConnection("jdbc:mysql://" + PropertiesLoader.readBaseLocation + "/"+PropertiesLoader.dbname+"?characterEncoding=UTF-8", PropertiesLoader.username,
+//						PropertiesLoader.password);
+//			}
+//			statement = connection.createStatement();
+//					
+//		} catch (Exception e) {
+//			e.printStackTrace();
+//			lastPageNumber = -1;
+//			errorCount = 5;
+//		}
+		
+	}
+
+	/**
+	 * Ova metoda obradjuje sajtove kod kojih sve rezultate, tj. sve paginacione
+	 * strane dobijamo jednim upitom.
+	 */
+	protected void typeOneProcessing() {
+		paginationURL = null;
+		detailsPageURL = null;
+		String pageHtml = null;
+		String detailsPageHtml = null;
+		String carURLHash = null;
+		long carID;
+		int errorDelay = initialErrorDelay;
+
+		Matcher paginationMatcher;
+		Matcher urlMatcher;
+		HashSet<String> carURLs;
+
+		mainLoop: for (int i = firstPageNumber; i <= lastPageNumber; i += pageIncrement) {
+			paginationURL = incrementPartOneURL + formParam + formValue + pageNumberParam + i + incrementPartTwoURL;
+			pageHtml = getHtml(paginationURL);
+			
+		//	System.out.println(pageHtml);
+
+			if (pageHtml != null) {
+				System.out.println("-Pagination page: " + paginationURL);
+				errorCount = 0;
+				errorDelay = initialErrorDelay;
+				urlMatcher = detailsPagePattern.matcher(pageHtml);
+				carURLs = new HashSet<String>();
+				while (urlMatcher.find()) {
+					detailsPageURL = urlMatcher.group(1);
+					if (!detailsPageURL.startsWith("http:")) {
+						detailsPageURL = baseURL + detailsPageURL;
+					}
+
+					detailsPageURL = fixURL(detailsPageURL);
+					System.out.println("\t"+ detailsPageURL);
+					carURLHash = Sha1Hash.SHA1(detailsPageURL);
+
+					if (carURLs.contains(carURLHash)) {
+						continue;
+					} else {
+						carURLs.add(carURLHash);
+					}
+					
+					// test for duplicate url
+//					if (1 == 1 + 0) {
+//					//	DBWorksOnline.updateTime(carID, countryDescription.getCode());
+//						recordCount++;
+//						updatedRecordsCount++;
+//						continue;
+//					}
+
+					detailsPageHtml = getHtml(detailsPageURL);
+				//	System.out.println(detailsPageHtml);
+
+					if (detailsPageHtml != null) {
+						write(detailsPageHtml);
+						recordCount++;
+						newRecordsCount++;
+					}
+					
+					sleep(requestDelay);
+				}
+				paginationMatcher = paginationPattern.matcher(pageHtml);
+				if (!paginationMatcher.find()) {
+					if (paginationCheckTime != 0) {
+					//	System.out.println("Last pagination check for " + webSiteID + " in progress ...");
+						sleep(paginationCheckTime);
+
+						pageHtml = getHtml(paginationURL);
+						if (pageHtml == null) {
+							break;
+						}
+
+						paginationMatcher = paginationPattern.matcher(pageHtml);
+						if (!paginationMatcher.find()) {
+							break;
+						} else {
+							i -= pageIncrement;
+						}
+					} else {
+						break;
+					}
+				}
+			} else {
+				errorCount++;
+				if (errorCount == 5) {
+					break;
+				}
+				i -= pageIncrement;
+				
+				sleep(errorDelay);
+				errorDelay *= 5;				
+			}
+			if (stopped) {
+				break;
+			}
+		}
+	}
+
+	/**
+	 * Ova metoda obradjuje sajtove kod kojih moramo redefinisati upit (po
+	 * modelu naprimer) da bi dobili rezultate Metoda podrazumeva
+	 */
+	protected void typeTwoProcessing() {
+		for (int i = 0; i < formValues.size(); i++) {
+			formValue = formValues.get(i);
+			typeOneProcessing();
+			
+			if (errorCount == 5) {
+				break;
+			}
+			if (stopped) {
+				break;
+			}
+		}
+	}
+
+	protected void siteMapProcessing() {
+		Matcher urlMatcher;
+		String siteMapHtml = null;
+		String carHtml = null;
+		String carURLHash = null;
+		long carID;
+		HashSet<String> carURLs;
+
+		if (siteMapURLs != null) {
+			mainLoop: for (String siteMapURL : siteMapURLs) {
+				siteMapHtml = getHtml(siteMapURL);
+				if (siteMapHtml != null) {
+				//	System.out.println("-Sitemap page: " + siteMapURL);
+					urlMatcher = detailsPagePattern.matcher(siteMapHtml);
+					carURLs = new HashSet<String>();
+					while (urlMatcher.find()) {
+					//	if ((applicationMode == ApplicationMode.Online) && ((carCount % 1) == 0)) {
+					//		updateLogOnline();
+					//	}
+
+						detailsPageURL = urlMatcher.group(1);
+						if (!detailsPageURL.startsWith("http:")) {
+							detailsPageURL = baseURL + detailsPageURL;
+						}
+
+						detailsPageURL = fixURL(detailsPageURL);
+						carURLHash = Sha1Hash.SHA1(detailsPageURL);
+
+						if (carURLs.contains(carURLHash)) {
+							continue;
+						} else {
+							carURLs.add(carURLHash);
+						}
+
+						if (1 == 0) {
+						//	DBWorksOnline.updateTime(carID, countryDescription.getCode());
+							recordCount++;
+							updatedRecordsCount++;
+							continue;
+						}
+
+						carHtml = getHtml(detailsPageURL);
+
+						if (carHtml != null) {
+							write(carHtml);
+							recordCount++;
+							newRecordsCount++;
+						}
+
+						sleep(requestDelay);
+						if (stopped) {
+							break mainLoop;
+						}
+					}
+				}
+			}
+		}
+	}
+
+	protected void postMethodProcessing() {
+		paginationURL = null;
+		detailsPageURL = null;
+		String pageHtml = null;
+		String carHtml = null;
+		String carURLHash = null;
+		long carID;
+		int errorDelay = initialErrorDelay;
+
+		Matcher paginationMatcher;
+		Matcher urlMatcher;
+		HashSet<String> carURLs;
+
+		mainLoop: for (int i = firstPageNumber; i <= lastPageNumber; i += pageIncrement) {
+			postMethodParams.put(pageNumberParam, pageNumberValuePartOne + i + pageNumberValuePartTwo);
+			pageHtml = getHtmlByPost();
+			System.out.println(pageHtml);
+
+			if (pageHtml != null) {
+			//	System.out.println("-Pagination page: " + postPageURL + " with params:" + postMethodParams);
+				errorCount = 0;
+				errorDelay = initialErrorDelay;
+				urlMatcher = detailsPagePattern.matcher(pageHtml);
+				carURLs = new HashSet<String>();
+				while (urlMatcher.find()) {
+//					if ((applicationMode == ApplicationMode.Online) && ((carCount % 1) == 0)) {
+//						updateLogOnline();
+//					}
+
+					detailsPageURL = urlMatcher.group(1);
+					if (!detailsPageURL.startsWith("http:")) {
+						detailsPageURL = baseURL + detailsPageURL;
+					}
+
+					detailsPageURL = fixURL(detailsPageURL);
+					carURLHash = Sha1Hash.SHA1(detailsPageURL);
+
+					if (carURLs.contains(carURLHash)) {
+						continue;
+					} else {
+						carURLs.add(carURLHash);
+					}
+
+					if (0 == 1) {
+					//	DBWorksOnline.updateTime(carID, countryDescription.getCode());
+						recordCount++;
+						updatedRecordsCount++;
+						continue;
+					}
+
+					carHtml = getHtml(detailsPageURL);
+
+					if (carHtml != null) {
+						write(carHtml);
+						recordCount++;
+						newRecordsCount++;
+					}
+					
+					sleep(requestDelay);
+				}
+				paginationMatcher = paginationPattern.matcher(pageHtml);
+				if (!paginationMatcher.find()) {
+					if (paginationCheckTime != 0) {
+					//	System.out.println("Last pagination check for " + webSiteID + " in progress ...");
+						sleep(paginationCheckTime);
+
+						pageHtml = getHtmlByPost();
+						if (pageHtml == null) {
+							break;
+						}
+
+						paginationMatcher = paginationPattern.matcher(pageHtml);
+						if (!paginationMatcher.find()) {
+							break;
+						} else {
+							i -= pageIncrement;
+						}
+					} else {
+						break;
+					}
+				}
+			} else {
+				errorCount++;
+				if (errorCount == 5) {
+					break;
+				}
+				i -= pageIncrement;
+				
+				sleep(errorDelay);
+				errorDelay *= 5;
+				
+			}
+			if (stopped) {
+				break;
+			}
+		}
+	}
+
+	public void write(String carHtml) {
+		
+	//	SearchResult searchResult = new SearchResult();
+	//	searchResult.setPageUrl(carURL);
+	//	onlineWrite(carHtml, searchResult);
+		
+		
+	//	DBWorksOnline.addResultToBase(searchResult);
+		
+
+		
+	//	System.out.println(carCount + "." + carURL);
+	}
+
+
+	protected String getHtml(String url) {
+		if (!useCookies) {
+			return getHtmlWithoutCookies(url);
+		} else {
+			return getHtmlWithCookies(url);
+		}
+	}
+
+	protected String getHtmlWithoutCookies(String url) {
+		HttpURLConnection httpURL;
+		BufferedReader br;
+		StringBuffer html = new StringBuffer();
+		String temp;
+
+		if (url.contains(" ")) {
+			url = url.replaceAll(" ", "%20");
+		}
+		if (url.contains("&amp;")) {
+			url = url.replaceAll("&amp;", "&");
+		}
+
+		try {
+			httpURL = (HttpURLConnection) new URL(url).openConnection();
+			httpURL.setReadTimeout(60000);
+			httpURL.setConnectTimeout(60000);
+			if (!firefoxMask) {
+				httpURL.setRequestProperty("User-Agent", "Ooyyo/1.0 (Used and new cars search engine; http://www.ooyyo.com/en/static/content/5/about-us/index.html; contacts@ooyyo.com)");
+			} else {
+				httpURL.setRequestProperty("User-Agent", "Mozilla/5.0 (X11; U; Linux x86_64; en-US; rv:1.9.0.8) Gecko/2009032712 Ubuntu/8.10 (intrepid) Firefox/3.0.8");
+			}
+
+			br = new BufferedReader(new InputStreamReader(httpURL.getInputStream(), charset));
+
+			while ((temp = br.readLine()) != null) {
+				html.append(temp).append("\n");
+			}
+
+			br.close();
+			return html.toString();
+		} catch (Exception e) {
+			System.err.println("#### GREŠKA ZA: " + url + " ####");
+			e.printStackTrace();			
+			return null;
+		}
+	}
+
+	protected String getHtmlWithCookies(String url) {
+		if (httpClient == null) {
+			httpClient = new HttpClient();
+		}
+		BufferedReader br;
+		StringBuffer html = new StringBuffer();
+		String temp;
+		GetMethod method = new GetMethod(url);
+		method.setFollowRedirects(false);
+		HttpMethodParams params = new HttpMethodParams();
+
+		params.setSoTimeout(60000);
+		params.setCookiePolicy(CookiePolicy.DEFAULT);
+
+		if (!firefoxMask) {
+			params.setParameter(HttpMethodParams.USER_AGENT, "Ooyyo/1.0 (Used and new cars search engine; http://www.ooyyo.com/en/static/content/5/about-us/index.html; contacts@ooyyo.com)");
+		} else {
+			params.setParameter(HttpMethodParams.USER_AGENT, "Mozilla/5.0 (X11; U; Linux x86_64; en-US; rv:1.9.0.8) Gecko/2009032712 Ubuntu/8.10 (intrepid) Firefox/3.0.8");
+		}	
+
+		params.setParameter("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+		params.setParameter("Accept-Encoding", "gzip, deflate");		
+		params.setParameter("Host", "www.autotrader.ca");
+		params.setParameter("Referer", "http://www.autotrader.ca/");
+		
+		try {
+			int statusCode = httpClient.executeMethod(method);
+			
+			if (statusCode == HttpStatus.SC_OK) {
+				br = new BufferedReader(new InputStreamReader(method.getResponseBodyAsStream(), charset));
+				while ((temp = br.readLine()) != null) {
+					html.append(temp).append("\n");
+				}
+
+				br.close();
+				return html.toString();
+			} else {
+				return null;
+			}
+		} catch (Exception e) {
+			System.err.println("#### GREŠKA ZA: " + url + " ####");
+			e.printStackTrace();			
+			return null;
+		}
+	}
+
+	protected String getHtmlByPost() {
+		if (httpClient == null) {
+			httpClient = new HttpClient();
+		}
+		BufferedReader br;
+		StringBuffer html = new StringBuffer();
+		String temp;
+		PostMethod method = new PostMethod(postPageURL);
+		HttpMethodParams params = new HttpMethodParams();
+
+		params.setSoTimeout(60000);
+		params.setCookiePolicy(CookiePolicy.BROWSER_COMPATIBILITY);
+
+		if (!firefoxMask) {
+			params.setParameter(HttpMethodParams.USER_AGENT, "Ooyyo/1.0 (Used and new cars search engine; http://www.ooyyo.com/en/static/content/5/about-us/index.html; contacts@ooyyo.com)");
+		} else {
+			params.setParameter(HttpMethodParams.USER_AGENT, "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/34.0.1847.131 Safari/537.36");
+		}
+
+		method.setParams(params);
+
+		for (String param : postMethodParams.keySet()) {
+			method.addParameter(param, postMethodParams.get(param));
+		}
+
+		try {
+			int statusCode = httpClient.executeMethod(method);
+			if (statusCode == HttpStatus.SC_OK) {
+				br = new BufferedReader(new InputStreamReader(method.getResponseBodyAsStream(), charset));
+				while ((temp = br.readLine()) != null) {
+					html.append(temp).append("\n");
+				}
+
+				br.close();
+				return html.toString();
+			} else {
+				return null;
+			}
+		} catch (Exception e) {
+			System.err.println("#### GREŠKA ZA: " + postPageURL + " ####");
+			e.printStackTrace();			
+			return null;
+		}
+	}
+
+	protected void updateLogOnline() {
+		try {
+			preparedStatement.setTimestamp(1, new Timestamp(System.currentTimeMillis()));
+			preparedStatement.setInt(2, recordCount);
+			preparedStatement.setInt(3, newRecordsCount);
+			preparedStatement.setInt(4, updatedRecordsCount);
+			preparedStatement.setString(5, fixURL(paginationURL));
+			preparedStatement.setString(6, detailsPageURL);
+			preparedStatement.executeUpdate();
+		} catch (SQLException e) {
+			e.printStackTrace();
+		}
+
+	}	
+
+	protected String fixURL(String url) {
+		if (url != null) {
+			return url.replaceAll(" ", "%20").replaceAll("&amp;", "&").replaceAll("\\\\", "\\\\\\\\").replaceAll("'", "\\\\'");
+		} else {
+			return "";
+		}
+	}
+
+	protected void sleep(int time) {
+		try {
+			Thread.sleep(time);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	public void stopBot() {
+		stopped = true;
+	}	
+	
+	public String fetchPageContent(String fromPage) {
+		try {
+			if (httpClient == null) {
+				httpClient = new HttpClient();
+				httpClient.getHttpConnectionManager().getParams().setConnectionTimeout(60000); 
+				httpClient.getHttpConnectionManager().getParams().setSoTimeout(60000);
+			}
+			
+			GetMethod get = new GetMethod(fromPage);
+			httpClient.executeMethod(get);
+			
+			StringBuilder sb = new StringBuilder();
+			String line;
+			BufferedReader in = new BufferedReader(new InputStreamReader(get.getResponseBodyAsStream(), "utf-8"));
+			while ((line = in.readLine()) != null) {
+				sb.append(line).append("\n");
+			}
+			
+			in.close();
+			get.releaseConnection();
+			
+			return sb.toString();			
+		} catch (Exception e) {
+			System.err.println("#### GREŠKA ZA: " + fromPage + " ####");
+			e.printStackTrace();			
+			return null;
+		}
+	}
+	
+	public ArrayList<String> findAllInString(String string, Pattern pattern) {
+		ArrayList<String> list = new ArrayList<String>();
+		
+		Matcher m = pattern.matcher(string);
+		while (m.find()) {
+			String value = m.group(1).trim();
+			list.add(value);
+		}
+		
+		return list;
+		
+		
+	}
+
+	public String [] findGroupsInString(String string, Pattern pattern, int groups) {
+		String [] parts = new String[groups];
+		
+		Matcher m = pattern.matcher(string);
+		while (m.find()) {
+			for (int curGroup = 0; curGroup < groups; curGroup++) {
+				parts[curGroup] = m.group(curGroup+1).trim();
+			}
+			
+			return parts;
+		}
+		return null;
+	}
+	
+	public ArrayList<String []> findAllGroupsInString(String string, Pattern pattern) {
+		ArrayList<String []> parts = new ArrayList<String[]>();
+		
+		Matcher m = pattern.matcher(string);
+		while (m.find()) {
+			String groups[] = new String[m.groupCount()]; 
+			for (int curGroup = 0; curGroup < m.groupCount(); curGroup++) {
+				groups[curGroup] = m.group(curGroup+1).trim();
+			}
+			
+			parts.add(groups);
+		}
+		return parts;
+	}
+	
+	public String findInString(String string, Pattern pattern) {
+		if (pattern == null) return "";
+		Matcher m = pattern.matcher(string);
+		while (m.find()) {
+			String value = m.group(1).trim();
+		//	System.out.println(value);
+			return value;
+		}
+		return "";
+	}
+	
+	public String formatValue(String value) {
+		value = value.replaceAll("\"", "'");
+		return "\"" + value + "\",";
+	}
+	
+	public String formatValueWithoutAppend(String value) {
+		value = value.replaceAll("\"", "'");
+		return "\"" + value + "\"";
+	}
+	
+	public String formatValue(String value, String separator) {
+		value = value.replaceAll("\"", "'");
+		return "\"" + value + "\"" + separator;
+	}
+	
+	public void processingEnd() {
+		System.out.println("Crawl finished!");
+	}
+	
+	public String getDataFromStream(InputStream inS, boolean inGZIP) {
+		try {
+			BufferedReader in = null;
+			if (inGZIP) {
+				in = new BufferedReader(new InputStreamReader(new GZIPInputStream(inS)));
+			} else {
+				in = new BufferedReader(new InputStreamReader(inS));
+			}
+			
+			StringBuilder sb = new StringBuilder();
+			String line = null;
+			while ((line = in.readLine()) != null) {
+				sb.append(line).append("\n");
+			}
+			
+			in.close();
+			return sb.toString();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+		return null;
+	}
+}

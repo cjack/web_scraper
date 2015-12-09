@@ -1,0 +1,107 @@
+package bots;
+
+import master.Master;
+import util.*;
+
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.util.regex.Pattern;
+import java.util.*;
+
+import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.methods.GetMethod;
+
+public class SiteLinkScraper extends Master {
+	
+	private ArrayList<String> siteList;
+
+	public SiteLinkScraper(Integer firstPage, Integer lastPage) {		
+		this();
+		firstPageNumber = firstPage;
+		lastPageNumber = lastPage;
+	}
+	
+	public SiteLinkScraper() {		
+		siteList = Files.loadListFromFile("input.txt");
+		
+		writter = new Writter("output.csv");
+		writter.writeLine("Website,Facebook Link,Tweeter Link,Pintrest Link,Instagram Link,Yelp Link,Youtube Link");
+		
+		pProc = new PatternProcessor();
+		
+		pProc.addPattern(2, Pattern.compile("href=[\"\'](https*://[www\\.]*facebook.com/.+?)[\"\']"));
+		pProc.addPattern(3, Pattern.compile("href=[\"\'](https*://[www\\.]*twitter.com/.+?)[\"\']"));
+		pProc.addPattern(4, Pattern.compile("href=[\"\'](https*://[www\\.]*pinterest.com/.+?)[\"\']"));
+		pProc.addPattern(5, Pattern.compile("href=[\"\'](https*://[www\\.]*instagram.com/.+?)[\"\']"));
+		pProc.addPattern(6, Pattern.compile("href=[\"\'](https*://[www\\.]*yelp.com/biz/.+?)[\"\']"));
+		pProc.addPattern(7, Pattern.compile("href=[\"\'](https*://[www\\.]*youtube.com/.+?)[\"\']"));
+	}	
+
+	public static void main(String[] args) {
+		if (args.length == 2) {
+			new SiteLinkScraper(Integer.parseInt(args[0]), Integer.parseInt(args[1])).start();
+		} else {
+			new SiteLinkScraper().start();
+		}
+		
+	}
+
+	@Override
+	public void run() {
+		
+		for (String site : siteList) {
+			System.out.println(site);
+			
+			String pagehtml = fetchPageContent(site);
+						
+			if (pagehtml == null) {
+				pagehtml = "";
+			}
+			
+			pagehtml = pagehtml.replace("www.facebook.com/share.php", "nothing");
+			
+			pProc.addData(1, site);
+			
+			pProc.processPatterns(pagehtml, writter);
+		}
+		
+		writter.close();
+		System.out.println("FINISHED");
+		
+	}
+	
+	@Override
+	public void write (String data) {
+		
+	}
+	
+	public String fetchPageContent(String fromPage) {
+		try {
+			if (httpClient == null) {
+				httpClient = new HttpClient();
+			}
+			
+			GetMethod get = new GetMethod(fromPage);
+			httpClient.executeMethod(get);
+			
+			StringBuilder sb = new StringBuilder();
+			String line;
+			BufferedReader in = new BufferedReader(new InputStreamReader(get.getResponseBodyAsStream(), "utf-8"));
+			while ((line = in.readLine()) != null) {
+				sb.append(line).append("\n");
+			}
+			
+			in.close();
+			get.releaseConnection();
+			
+			return sb.toString();			
+		} catch (Exception e) {
+			System.err.println("#### GREŠKA ZA: " + fromPage + " ####");
+		//	e.printStackTrace();			
+			return null;
+		}
+	}
+	
+}
+
+

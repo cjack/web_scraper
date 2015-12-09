@@ -1,0 +1,45 @@
+package bots;
+
+import java.util.ArrayList;
+import java.util.regex.Pattern;
+
+import master.Master;
+import util.*;
+
+public class ExampleSc extends Master {
+
+	public ExampleSc() {		
+		pProc = new PatternProcessor();
+		writter = new Writter("output.csv");
+		
+		pProc.addPattern(1, Pattern.compile("value=\"(.+?)\""));
+		pProc.addPattern(2, Pattern.compile(">(.+?)<"));
+		pProc.addPattern(3, Pattern.compile("</(.+?)>"));
+		
+		pProc.addReplacement(3, "ptio", "");
+		
+	}		
+
+	public static void main(String[] args) {		
+		new ExampleSc().start();
+	}
+
+	@Override
+	public void run() {		
+		ArrayList<String> fileData = Files.loadListFromFile("input.txt");
+		
+		for (String data : fileData) {
+			write(data);
+		}
+		
+		
+	}
+	
+	@Override
+	public void write (String data) {
+		pProc.processPatterns(data, writter);
+	}
+	
+}
+
+
