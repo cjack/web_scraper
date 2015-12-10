@@ -1,0 +1,133 @@
+package bots;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import org.apache.commons.httpclient.Header;
+import org.apache.commons.httpclient.methods.PostMethod;
+
+import util.Sha1Hash;
+
+import master.Master;
+
+public class Seai extends Master {
+	
+	private Pattern idPattern;
+
+	public Seai()	{
+		baseURL = "https://hes.seai.ie/";
+		firefoxMask = true;
+		
+		firstPageNumber = 1;
+		pageIncrement = 1;
+		
+		lastPageNumber = 48;
+		
+		idPattern = Pattern.compile("<tr class=\"Grid(?:AlternatingRow|Row)Style\">.+?(\\d+)</span>", Pattern.DOTALL);
+	}		
+
+	public static void main(String[] args) {		
+		new Seai().run();
+	}
+
+	@Override
+	public void run() {
+
+		String pageHtml = fetchPageContent("https://hes.seai.ie/GrantProcess/ContractorSearch.aspx");
+	//	System.out.println(pageHtml);
+		
+		String viewstate = findInString(pageHtml, Pattern.compile("id=\"__VIEWSTATE\" value=\"(.+?)\""));
+		String eventValidation = findInString(pageHtml, Pattern.compile("id=\"__EVENTVALIDATION\" value=\"(.+?)\""));
+		
+//		PostMethod post = new PostMethod("https://hes.seai.ie/GrantProcess/ContractorSearch.aspx"); 
+//		
+//		post.setRequestHeader("X-MicrosoftAjax", "Delta=true");
+//		post.setRequestHeader("Host", "hes.seai.ie");
+//		post.setRequestHeader("Referer", "https://hes.seai.ie/GrantProcess/ContractorSearch.aspx");
+//		post.setRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:33.0) Gecko/20100101 Firefox/33.0");
+//		post.setRequestHeader("Content-Length", "9025");
+//		post.setRequestHeader("Content-Type", "application/x-www-form-urlencoded; charset=utf-8");
+//		post.setRequestHeader("Accept-Encoding", "gzip, deflate");
+//		
+//		
+//		post.setParameter("__ASYNCPOST", "true");
+//		post.setParameter("__EVENTARGUMENT", "Sort$CompanyName");
+//		post.setParameter("__EVENTTARGET", "ctl00$DefaultContent$ContractorSearch1$gridContractor$gridview");
+//		post.setParameter("__EVENTVALIDATION", eventValidation);
+//		post.setParameter("__SCROLLPOSITIONX", "0");
+//		post.setParameter("__SCROLLPOSITIONY", "114");
+//		post.setParameter("__VIEWSTATE", viewstate);		
+//		post.setParameter("ctl00$ScriptManager1", "ctl00$DefaultContent$ContractorSearch1$gridContractor$container|ctl00$DefaultContent$ContractorSearch1$gridContractor$gridview");
+//	
+//		try {
+//			httpClient.executeMethod(post);	
+//			System.out.println(post.getResponseBodyAsString());
+//			
+//			System.out.println("Req Headers");
+//			for (Header h : post.getRequestHeaders()) {
+//				System.out.println(h.getName() + " - " + h.getValue());
+//			}
+//			
+//			for (Header h : post.getResponseHeaders()) {
+//				System.out.println(h.getName() + " - " + h.getValue());
+//			}
+//		} catch (Exception e) {
+//			e.printStackTrace();
+//		}			
+		
+		pageNumberParam = "__EVENTARGUMENT";
+		pageNumberValuePartOne = "1$";
+		
+		postPageURL = "https://hes.seai.ie/GrantProcess/ContractorSearch.aspx";
+		postMethodParams = new HashMap<String, String>();
+		
+		postMethodParams.put("__EVENTVALIDATION", eventValidation);
+		postMethodParams.put("__EVENTTARGET", "ctl00$DefaultContent$ContractorSearch1$gridContractor$grid_pager");
+		
+		postMethodParams.put("__VIEWSTATE", viewstate);
+		postMethodParams.put("__SCROLLPOSITIONX", "0");
+		postMethodParams.put("__SCROLLPOSITIONY", "114");
+		postMethodParams.put("ctl00$DefaultContent$ContractorSearch1$dfSearch$SolarHeating$ctl02$0", "on");
+		postMethodParams.put("ctl00$DefaultContent$ContractorSearch1$dfSearch$search", "Search");
+		
+		postMethodProcessing();
+		processingEnd();
+	}
+	
+	protected void postMethodProcessing() {
+		String pageHtml = null;
+
+		mainLoop: for (int i = firstPageNumber; i <= lastPageNumber; i += pageIncrement) {
+			postMethodParams.put(pageNumberParam, pageNumberValuePartOne + i + pageNumberValuePartTwo);
+			pageHtml = getHtmlByPost();
+		//	System.out.println(pageHtml);
+			HashSet<String> firmIds = new HashSet<String>();
+			System.out.println("Page " + i);
+
+			if (pageHtml != null) {
+				ArrayList<String> firmIDS = findAllInString(pageHtml, idPattern);
+				for (String firm : firmIDS) {
+					System.out.println(firm);
+					if (firmIds.contains(firm)) {
+						System.out.println("Postoji - " + firm);
+					} else {
+						firmIds.add(firm);
+					}
+				}
+				
+			} else {
+				errorCount++;				
+			}
+			if (stopped) {
+				break;
+			}
+		}
+	}
+	
+	
+}
+
+

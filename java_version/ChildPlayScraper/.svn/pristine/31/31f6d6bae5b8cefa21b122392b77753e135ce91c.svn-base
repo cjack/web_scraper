@@ -1,0 +1,346 @@
+package bots;
+
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
+import java.io.PrintWriter;
+import java.net.URL;
+import java.sql.DriverManager;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.zip.GZIPInputStream;
+
+import org.apache.commons.httpclient.Header;
+import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.HttpMethod;
+import org.apache.commons.httpclient.methods.GetMethod;
+import org.apache.commons.httpclient.methods.PostMethod;
+import org.apache.commons.httpclient.protocol.Protocol;
+
+import loaders.PropertiesLoader;
+import master.Master;
+import util.DBWorks;
+import util.MySSLSocketFactory;
+import util.Sha1Hash;
+import util.Utils;
+
+public class Yell extends Master {
+	
+	private PrintWriter csvOut;
+	
+	private ArrayList<String> categories;
+	private HttpClient client = null;
+
+	private Pattern namePattern;
+
+	private Pattern addressPattern;
+
+	private Pattern cityPattern;
+
+	private Pattern postCodePattern;
+
+	private Pattern phonePattern;
+
+	private Pattern sitePattern;
+
+	private Pattern noRobotsPagePattern;
+	
+	ArrayList<String> files;
+
+	private Pattern adGroupPattern;
+
+	private Pattern regionPattern;
+
+	public Yell()	{
+		super("yell");
+	//	PropertiesLoader.init("sambro.txt");
+	//	initDatabase();
+		loadFiles();
+		initWritters();
+	//	DBWorks.init("psytoday");
+		
+		baseURL = "http://www.yell.com";
+		
+		client = new  HttpClient();
+		
+		firefoxMask = true;
+		recordCount = 1;
+		requestDelay = 5000;
+		
+				
+		java.util.logging.Logger.getLogger("org.apache.http.wire").setLevel(java.util.logging.Level.FINEST);
+		java.util.logging.Logger.getLogger("org.apache.http.headers").setLevel(java.util.logging.Level.FINEST);
+		System.setProperty("org.apache.commons.logging.Log", "org.apache.commons.logging.impl.SimpleLog");
+		System.setProperty("org.apache.commons.logging.simplelog.showdatetime", "true");
+		System.setProperty("org.apache.commons.logging.simplelog.log.httpclient.wire", "ERROR");
+		System.setProperty("org.apache.commons.logging.simplelog.log.org.apache.http", "ERROR");
+		System.setProperty("org.apache.commons.logging.simplelog.log.org.apache.http.headers", "ERROR");
+		
+		incrementPartOneURL = "http://www.yell.com/ucs/UcsSearchAction.do?keywords=dentists&location=wales&scrambleSeed=228088675&pageNum=";
+		
+	//	firstPageNumber = 1;
+	//	lastPageNumber = 22;
+		
+		detailsPagePattern = Pattern.compile("COMPANYNAME\"\\s+href=\"(.+?)\"");
+		paginationPattern = Pattern.compile("");
+		
+		adGroupPattern = Pattern.compile("<div class=\"parentListing\".+?>(.+?)<li class=\"last\">", Pattern.DOTALL);
+		
+		namePattern = Pattern.compile("itemprop=\"name\">(.+?)<");
+		addressPattern = Pattern.compile("itemprop=\"streetAddress\">(.+?)<");
+		cityPattern = Pattern.compile("itemprop=\"addressLocality\">(.+?)<");
+		postCodePattern = Pattern.compile("itemprop=\"postalCode\">(.+?)<");
+		regionPattern = Pattern.compile("itemprop=\"addressRegion\">(.+?)<");
+		phonePattern = Pattern.compile("itemprop=\"telephone\">(.+?)</span>");
+		sitePattern = Pattern.compile("data-target-weblink.+?href=\"(.+?)\"", Pattern.DOTALL);
+		
+		
+		noRobotsPagePattern = Pattern.compile("<META NAME=\"ROBOTS\" CONTENT=\"NOINDEX, NOFOLLOW\">");
+		
+	}
+	
+	private void loadFiles() {
+		try {
+			
+			this.files = new ArrayList<String>();
+			
+			File files [] = new File("nireland").listFiles();
+			for (File f : files) {
+				BufferedReader in = new BufferedReader(new FileReader(f));
+				StringBuilder sb = new StringBuilder();
+				String line;
+				
+				while ((line = in.readLine()) != null) {
+					sb.append(line).append("\n");
+				}
+				
+				
+				this.files.add(sb.toString());
+				in.close();
+				
+			}
+			
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+	}
+
+	private void initWritters() {
+		try {
+			csvOut = new PrintWriter(new OutputStreamWriter(new FileOutputStream("yell.csv"), "UTF-8"));
+			csvOut.print("Name,Address,Phone,Site");
+			csvOut.print("\n");			
+			
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+	}
+	
+	private void writeLine(PrintWriter out, String text) {
+		try {
+			
+			out.println(text);
+		//	out.print("\n");
+			out.flush();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+	
+	private void writeLine(BufferedWriter out, String text) {
+		try {
+			out.write(text);
+			out.newLine();
+			out.flush();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+	
+
+	public void write(String pageHtml, String hash) {
+		
+	//	System.out.println(pageHtml);
+		
+		String name = findInString(pageHtml, namePattern);
+		String address = findInString(pageHtml, addressPattern).replaceAll(",", "") + ", " + findInString(pageHtml, cityPattern).replaceAll(",", "") + ", " + findInString(pageHtml, postCodePattern).replaceAll(",", "");
+		String city = findInString(pageHtml, regionPattern);
+		
+		if (!city.equals("")) {
+			address = address + ", " + city;
+		}
+		String phone = findInString(pageHtml, phonePattern).replaceAll("[^0-9\\s]", "");
+		String website = findInString(pageHtml, sitePattern);
+		
+		StringBuilder csv = new StringBuilder();
+		csv.append(formatValue(name)).append(formatValue(address)).append(formatValue(phone)).append(formatValue(website));
+				
+		csv.deleteCharAt(csv.length()-1);
+		
+		writeLine(csvOut, csv.toString());		
+		
+	}
+	
+	private void initDatabase() {
+		try {
+			if (connection == null) {
+				Class.forName("com.mysql.jdbc.Driver");
+				connection = DriverManager.getConnection("jdbc:mysql://" + PropertiesLoader.readBaseLocation + "/"+PropertiesLoader.dbname+"?characterEncoding=UTF-8", PropertiesLoader.username,
+						PropertiesLoader.password);
+			}
+			statement = connection.createStatement();
+					
+		} catch (Exception e) {
+			e.printStackTrace();
+			lastPageNumber = -1;
+			errorCount = 5;
+		}
+		
+	}
+	
+protected void typeOneProcessing() {
+	
+		Matcher adMatcher; 
+		String adGroup;
+		
+		for (String html : files) {
+			
+		//	System.out.println(pageHtml);			
+			
+			adMatcher = adGroupPattern.matcher(html);
+			
+			while (adMatcher.find()) {
+				adGroup = adMatcher.group(1);
+									
+				write(adGroup, "");				
+			}
+			
+		}
+	}	
+
+	public static void main(String[] args) {
+		
+		new Yell().run();
+	}
+	
+	public String fetchPageContent(String fromPage) {
+		try {			
+			
+			GetMethod get = new GetMethod(fromPage);
+			get.setRequestHeader("Host", "www.yell.com");
+			get.setRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.114 Safari/537.36");
+			get.setRequestHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8");
+			get.setRequestHeader("Accept-Encoding", "gzip,deflate,sdch");
+			get.setRequestHeader("Accept-Language", "sr-RS,sr;q=0.8,en-US;q=0.6,en;q=0.4,hr;q=0.2");
+			get.setRequestHeader("Cache-Control", "max-age=0");
+			get.setRequestHeader("Connection", "keep-alive");
+			client.executeMethod(get);
+			
+			StringBuilder sb = new StringBuilder();
+			String line;
+			BufferedReader in = new BufferedReader(new InputStreamReader(new GZIPInputStream(get.getResponseBodyAsStream())));
+			while ((line = in.readLine()) != null) {
+				sb.append(line).append("\n");
+			}
+			
+			in.close();
+			get.releaseConnection();
+			
+			System.out.println(sb.toString());
+			
+		//	System.out.println(sb.toString());
+			if (sb.toString().indexOf("<META NAME=\"ROBOTS\" CONTENT=\"NOINDEX, NOFOLLOW\">") > 0) {
+				getPageAfterRecheck(sb.toString(), fromPage);
+			}
+			
+			return sb.toString();			
+		} catch (Exception e) {
+			System.err.println("#### GREŠKA ZA: " + fromPage + " ####");
+			e.printStackTrace();			
+			return null;
+		}
+	}
+
+	private void getPageAfterRecheck(String pageHtml, String fromPage) {
+		try {
+			Pattern recheck1Pattern = Pattern.compile("<script type=\"text/javascript\" src=\"(.+?)\"");
+			String url = baseURL + findInString(pageHtml, recheck1Pattern);
+			
+			
+			GetMethod get = new GetMethod(url);
+			get.setRequestHeader("Host", "www.yell.com");
+			get.setRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.114 Safari/537.36");
+			get.setRequestHeader("Accept", "*/*");
+			get.setRequestHeader("Accept-Encoding", "gzip,deflate,sdch");
+			get.setRequestHeader("Accept-Language", "sr-RS,sr;q=0.8,en-US;q=0.6,en;q=0.4,hr;q=0.2");
+			get.setRequestHeader("Cache-Control", "max-age=0");
+			get.setRequestHeader("Connection", "keep-alive");
+			get.setRequestHeader("Referer", "");
+			
+			client.executeMethod(get);
+			
+			StringBuilder sb = new StringBuilder();
+			String line;
+			BufferedReader in = new BufferedReader(new InputStreamReader(new GZIPInputStream(get.getResponseBodyAsStream())));
+			while ((line = in.readLine()) != null) {
+				sb.append(line).append("\n");
+			}
+			
+			in.close();
+			
+			listResponseHeaders(get);
+			
+			System.out.println(sb.toString());
+			get.releaseConnection();
+			
+			
+			
+			
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+	}
+
+	@Override
+	public void run() {
+		typeOneProcessing();
+		processingEnd();
+	}
+	
+	public void processingEnd() {
+		try {
+			csvOut.close();			
+		} catch (Exception e) {
+			// TODO: handle exception
+		}
+		System.out.println("Crawl finished!");
+	}
+	
+	private void listResponseHeaders(HttpMethod method) {
+		Header [] headers = method.getResponseHeaders();
+		for (Header h : headers) {
+			System.out.println(h.getName() + ": " + h.getValue());
+		}
+	}
+	
+	private void listRequestHeaders(HttpMethod method) {
+		Header [] headers = method.getRequestHeaders();
+		for (Header h : headers) {
+			System.out.println(h.getName() + ": " + h.getValue());
+		}
+	}
+	
+		
+}
+
+

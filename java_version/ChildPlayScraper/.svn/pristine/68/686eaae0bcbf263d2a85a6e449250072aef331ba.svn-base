@@ -1,0 +1,160 @@
+package util;
+
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.FileOutputStream;
+import java.io.FileReader;
+import java.io.OutputStreamWriter;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+public class Citanje {
+	
+	private BufferedWriter csvOut;
+
+	private void loadFromFile() {
+		
+		try {
+			HashSet<String> lines = new HashSet<String>();
+			BufferedReader in = new BufferedReader(new FileReader("IndiaAndroidi.csv"));
+			
+			String line = null;
+			String newLine = null;
+			String notANumber = null;
+			
+			String pattern = "\"(.+?)\",\"(.+?)\",\"(.+?)\",\"(.+?)\"";
+			
+			try {
+				csvOut = new BufferedWriter(new OutputStreamWriter(new FileOutputStream("output.csv"), "UTF-8"));
+				csvOut.write("Title, Name, Phone, City, Date, Price");
+				csvOut.write("\n");
+			}catch(Exception e) {
+				e.printStackTrace();
+			}
+			
+			while ((line = in.readLine()) != null) {
+				
+				Pattern patern = Pattern.compile(pattern);
+				Matcher m = patern.matcher(line);
+				
+				if(m.find()) {
+					
+					newLine = m.group(1)+m.group(2)+m.group(3)+m.group(4);
+					notANumber = m.group(3);
+						
+					if(notANumber.contains("<")) {
+						continue;
+					}
+	
+					
+					
+					if (!lines.contains(newLine)) {
+						
+						lines.add(newLine);
+					
+						try {
+							csvOut.write(line);
+							csvOut.newLine();
+							csvOut.flush();
+						}catch(Exception e) {
+							e.printStackTrace();
+						}	
+					}
+				}
+			}
+			
+			in.close();
+			
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+		
+	}
+	
+private void loadFromFile2() {
+		
+		try {
+			HashSet<String> lines = new HashSet<String>();
+			BufferedReader in = new BufferedReader(new FileReader("output.csv"));
+			HashMap<String, Integer> map = new HashMap<String, Integer>();
+			
+			String line = null;
+			String newLine = null;
+			String notANumber = null;
+			
+			String pattern = "\"(.+?)\",\"(.+?)\",\"(.+?)\",\"(.+?)\"";
+			
+//			try {
+//				csvOut = new BufferedWriter(new OutputStreamWriter(new FileOutputStream("output.csv"), "UTF-8"));
+//				csvOut.write("Title, Name, Phone, City, Date, Price");
+//				csvOut.write("\n");
+//			}catch(Exception e) {
+//				e.printStackTrace();
+//			}
+			
+			int moreThan600 = 0;
+			
+			while ((line = in.readLine()) != null) {
+				
+				Pattern patern = Pattern.compile(pattern);
+				Matcher m = patern.matcher(line);
+				
+				if(m.find()) {
+					
+//					newLine = m.group(1)+m.group(2)+m.group(3)+m.group(4);
+//					notANumber = m.group(3);
+//						
+//					if(notANumber.contains("<")) {
+//						continue;
+//					}
+	
+					String key = m.group(4);
+					
+					if (map.containsKey(key)) {
+						map.put(key, map.get(key) + 1);
+					} else {
+						map.put(key, 1);
+					}
+				}
+			}
+			
+			System.out.println(map.keySet().size());
+			
+			for (String key : map.keySet()) {
+				System.out.println(key + "," + map.get(key));
+			}
+		
+			
+			
+			in.close();
+			
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+		
+	}
+	
+	/*
+	public static boolean isNumeric(String str) {  
+		
+	  try {  
+	    int broj = Integer.parseInt(str);  
+	  }catch(NumberFormatException e) {  
+	    return false;  
+	  }  
+	  return true;  
+	}
+	*/
+	
+	public static void main(String[] args) {
+		
+		
+		new Citanje().loadFromFile();
+
+	}
+
+}

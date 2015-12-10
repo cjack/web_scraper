@@ -1,0 +1,86 @@
+package bots;
+
+import master.Master;
+import util.*;
+import java.util.regex.Pattern;
+import java.util.*;
+
+import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.methods.GetMethod;
+
+public class YellowPagesAULinks extends Master {
+
+	public YellowPagesAULinks(Integer firstPage, Integer lastPage) {		
+		this();
+		firstPageNumber = firstPage;
+		lastPageNumber = lastPage;
+	}
+	
+	public YellowPagesAULinks() {	
+	//	httpClient = new HttpClient();
+	//	GetMethod get = new GetMethod("http://www.yellowpages.com.au/sitemap.xml.gz");
+	//	get.setRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/44.0.2403.130 Safari/537.36");
+	//	Writter w = new Writter("yellowpages_au_links.txt", true);
+		Writter w = new Writter("yellowpages_au_main_links.txt", true);
+		
+		try {
+		//	httpClient.executeMethod(get);
+		//	String siteMap = getDataFromStream(get.getResponseBodyAsStream(), true);
+			
+			String siteMap = Files.loadFileData("sitemap.xml");
+			
+			ArrayList<String> siteMapLinks = findAllInString(siteMap, Pattern.compile("<loc>(.+?)</loc>"));
+			
+			for (String siteMapLink : siteMapLinks) {
+				
+				w.writeLine(siteMapLink);
+				
+//				if (siteMapLink.contains("com.au/sup/sitemap-1")) {
+//					break;
+//				}
+//				
+//				System.out.println("Doing: " + siteMapLink);
+//				
+//				GetMethod getMap = new GetMethod(siteMapLink);
+//				getMap.setRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/44.0.2403.130 Safari/537.36");
+//				httpClient.executeMethod(getMap);
+//				String deepSiteMap = getDataFromStream(getMap.getResponseBodyAsStream(), true);
+//				
+//				ArrayList<String> urls = findAllInString(deepSiteMap, Pattern.compile("<loc>(.+?)</loc>"));
+//				for (String url : urls)  {
+//					w.writeLine(url);
+//					System.out.println(url);
+//				}
+//				
+//				sleep(2000);
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+		w.close();
+		
+	}	
+
+	public static void main(String[] args) {
+		if (args.length == 2) {
+			new YellowPagesAULinks(Integer.parseInt(args[0]), Integer.parseInt(args[1])).start();
+		} else {
+			new YellowPagesAULinks().start();
+		}
+		
+	}
+
+	@Override
+	public void run() {
+		
+	}
+	
+	@Override
+	public void write (String data) {
+		
+	}
+	
+}
+
+

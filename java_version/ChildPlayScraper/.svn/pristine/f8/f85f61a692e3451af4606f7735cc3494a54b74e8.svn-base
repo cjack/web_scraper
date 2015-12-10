@@ -1,0 +1,975 @@
+package bots;
+
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.awt.image.BufferedImage;
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.HashSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.zip.GZIPInputStream;
+
+import javax.imageio.ImageIO;
+import javax.swing.BorderFactory;
+import javax.swing.ImageIcon;
+import javax.swing.JButton;
+import javax.swing.JDialog;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JTextArea;
+import javax.swing.JTextField;
+import javax.swing.ScrollPaneConstants;
+
+import master.Master;
+
+import org.apache.commons.httpclient.Header;
+import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.URI;
+import org.apache.commons.httpclient.methods.GetMethod;
+import org.apache.commons.httpclient.methods.PostMethod;
+
+import util.Files;
+import util.PatternProcessor;
+import util.Patterns;
+import util.Utils;
+import util.Writter;
+
+public class Captcha2 extends Master {
+	
+	private HttpClient client;
+	private JFrame frame;
+	private JPanel captchaPanel;
+	private JTextField captchaText;
+	private JTextField startDateText;
+	private JTextField endDateText;
+	private static JButton startScrapeBtn;
+	private JTextArea textArea;
+	
+	private HashSet<String> casesDB = new HashSet<String>();
+	private ArrayList<String> newCases = new ArrayList<String>();
+	
+	private ArrayList<String> citiesToProcess = new ArrayList<String>();
+	private ArrayList<String> caseTypes = new ArrayList<String>();
+	private HashSet<String> plaintiffToSkip = new HashSet<String>();
+	
+	private SimpleDateFormat sdf = new SimpleDateFormat("MM/dd/yyyy");
+	private SimpleDateFormat sdfFileName = new SimpleDateFormat("MM_dd_yyyy_hh_mm");
+	private Writter logWritter;
+	
+	private boolean criminal;
+	private static Captcha2 c = null;
+
+	public Captcha2(boolean criminal) {	
+		this.criminal = criminal;
+		try {
+			client = new HttpClient();
+			
+			Date date = new Date();
+			
+			if (!criminal) {
+				lastFilename = "civil_cases_" +sdfFileName.format(date)+ ".csv";
+				
+				File f = new File("logs/");
+				if (!f.exists()) f.mkdirs();
+				
+				logWritter = new Writter("logs/civil_cases_log_" +sdfFileName.format(date)+ ".txt");				
+				writter = new Writter(lastFilename);
+				
+				writter.writeLine("Case Type,Filed Date,Plaintiff Name,Plaintiff Address,Plaintiff Attorney,Defendant Name,Defendant Address,Defendant Attorney,Hearing Info,Hearing Date,Case Number");
+			} else {
+				lastFilename = "criminal_cases_" +sdfFileName.format(date)+ ".csv";
+				
+				File f = new File("logs/");
+				if (!f.exists()) f.mkdirs();
+				
+				logWritter = new Writter("logs/criminal_cases_log_" +sdfFileName.format(date)+ ".txt");				
+				writter = new Writter(lastFilename);
+								
+				writter.writeLine("Defendant Name,Defendant Address,Filed Date,Status,Charge,Offense Date,Case Type,Arrest Date,Sentence time,Hearings Info,Case Number");
+				
+				
+			}
+			
+			
+			
+					
+			ArrayList<String> casesdb = Files.loadListFromFile("cases.db", 11, "\",\"");
+			for (String caseEntry : casesdb) {
+				casesDB.add(caseEntry.replace("\"", ""));
+			}
+			
+			caseTypes.addAll(Files.loadListFromFile("caseTypes.txt"));
+			plaintiffToSkip.addAll(Files.loadListFromFile("plaintiffs.txt"));
+					    
+		    frame = new JFrame("Case Scrapper");		    
+		    frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+		    frame.setLayout(null);
+		    frame.setSize(600, 600);
+		    frame.setLocationRelativeTo(null);
+		    
+		    JButton getCaptchaBtn = new JButton("Get Captcha");
+		    getCaptchaBtn.setSize(150, 30);
+		    getCaptchaBtn.setLocation(225, 20);
+		    getCaptchaBtn.addActionListener(new ActionListener() {
+				
+				@Override
+				public void actionPerformed(ActionEvent arg0) {
+					getCaptcha();
+					
+				}
+			});
+		    frame.add(getCaptchaBtn);
+		    
+		    captchaPanel = new JPanel();
+		    
+		    captchaPanel.setSize(300, 75);
+		    captchaPanel.setLocation(150, 70);
+		    captchaPanel.setBorder(BorderFactory.createBevelBorder(1));
+		    frame.add(captchaPanel);
+		    
+		    JLabel labelCaptcha = new JLabel("Enter captcha");
+		    labelCaptcha.setLocation(200, 155);
+		    labelCaptcha.setSize(100, 25);
+		    
+		    captchaText = new JTextField();
+		    captchaText.setLocation(300, 155);
+		    captchaText.setSize(100, 25);
+		    
+		    JLabel labelDate = new JLabel("Start date");
+		    labelDate.setLocation(200, 180);
+		    labelDate.setSize(100, 25);
+		    
+		    startDateText = new JTextField();
+		    startDateText.setLocation(300, 180);
+		    startDateText.setSize(100, 25);
+		    
+		    JLabel endlabelDate = new JLabel("End date");
+		    endlabelDate.setLocation(200, 205);
+		    endlabelDate.setSize(100, 25);
+		    
+		    endDateText = new JTextField();
+		    endDateText.setLocation(300, 205);
+		    endDateText.setSize(100, 25);
+		    
+		    textArea = new JTextArea();
+			textArea.setSize(460, 300);
+			textArea.setLocation(20, 110);
+			
+			JScrollPane scroll = new JScrollPane(textArea);
+			scroll.setSize(550, 260);
+			scroll.setLocation(20, 290);
+			
+	        scroll.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS);
+	        
+	        startScrapeBtn = new JButton("Start scrape");
+			startScrapeBtn.setSize(150, 30);
+			startScrapeBtn.setLocation(225, 250);
+			startScrapeBtn.addActionListener(new ActionListener() {
+				 
+		//	final Captcha2 c = new Captcha2(false);
+		//	final Captcha2 c = new Captcha2(true);
+			
+			@Override
+			public void actionPerformed(ActionEvent arg0) {
+					startScrapeBtn.setEnabled(false);
+					if (checkCaptcha()) {
+						c.start();
+					} else {
+						startScrapeBtn.setEnabled(true);
+						captchaPanel.removeAll();
+						captchaPanel.repaint();
+					}
+					
+					
+				}
+				
+			});
+		    
+		    frame.add(labelCaptcha);
+		    frame.add(labelDate);
+		//    frame.add(endlabelDate);
+		    frame.add(captchaText);
+		    frame.add(startDateText);
+		//    frame.add(endDateText);
+		    frame.add(startScrapeBtn);
+		    frame.add(scroll);
+		    
+		    frame.setVisible(true);
+		    
+		    
+		    
+			Runtime.getRuntime().addShutdownHook(new Thread() {
+	            public void run() {
+	                saveNewCases();
+	            }
+	        });
+
+			
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+		
+	}
+	
+	private Pattern nextPattern = Pattern.compile("value=\"Next\"");
+	private Pattern wrapPattern = Pattern.compile("<tr class=(.+?)</tr>", Pattern.DOTALL);
+	private Pattern tdPattern = Pattern.compile("(<td class=\"gridrow\".+?</td>)", Pattern.DOTALL);
+	private Pattern td2Pattern = Pattern.compile("<td>(.*?)</td>", Pattern.DOTALL);
+	private Pattern trPattern = Pattern.compile("<tr class=\"grid(?:row|alternaterow)\">(.+?)</tr>", Pattern.DOTALL);
+	
+	private Pattern plantifWrapP = Pattern.compile("Begin plaintiff.+?(<tr class=\"gridrow.+?)End plaintiff\\.jsp", Pattern.DOTALL);
+	private Pattern defendantWrapP = Pattern.compile("Begin defendant.+?(<tr class=\"gridrow.+?)End defendant\\.jsp", Pattern.DOTALL);
+	private Pattern hearingWrapP = Pattern.compile("Begin hearing.+?(<tr class=\"gridrow.+?)End hearing\\.jsp", Pattern.DOTALL);
+	
+	private int pageCount = 0;
+	private int count = 0;
+
+	private void extractData() {	
+		
+		pProc.addPattern(2, Pattern.compile(">Filed Date\\&nbsp;:\\s*</td>\\s+.+?>\\&nbsp;(.+?)<"));
+		
+		//	pProc.addReplacement(3, "\\&lt;", "<");
+		//	pProc.addReplacement(3, "\\&gt;", ">");
+			
+			for (String cityToProcess : citiesToProcess) {
+				String parts [] = cityToProcess.split("~");
+				addTextToArea("Starting scrape for " + parts[1]);
+				
+				
+				GetMethod get = new GetMethod("https://eapps.courts.state.va.us/gdcourts/caseSearch.do?fromSidebar=true&searchLanding=searchLanding&searchType=hearingDate&searchDivision=T&searchFipsCode=" + parts[0]);
+				get.setRequestHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+				get.setRequestHeader("Host", "eapps.courts.state.va.us");
+				get.setRequestHeader("Referer", "https://eapps.courts.state.va.us/gdcourts/caseSearch.do?welcomePage=welcomePage");			
+			
+				try {	
+					client.executeMethod(get);
+					
+					Calendar c = Calendar.getInstance();
+					c.add(Calendar.DAY_OF_YEAR, 90);
+					
+					Date startDate = c.getTime();
+					Date endDate = new Date();
+					
+					if (!this.startDate.trim().equals("")) {
+						startDate = sdf.parse(this.startDate);
+					}			
+					
+					while (startDate.after(endDate)) {		
+						
+						Calendar cal = Calendar.getInstance();
+						cal.setTime(startDate);
+						if (cal.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY || cal.get(Calendar.DAY_OF_WEEK) == Calendar.SATURDAY) {
+							cal.add(Calendar.DAY_OF_MONTH, -1);
+							startDate = cal.getTime();
+							continue;
+						}
+						
+						String time = sdf.format(startDate);
+						pProc.addData(10, time);
+						pageCount = 1;
+						
+						addTextToArea("Starting scrape for date " + time);	
+						addTextToArea("Processing page " + pageCount++);
+						
+						String html = "";
+						
+						int tryTimes = 0;
+						while (true) {
+							if (tryTimes == 5) break;
+							tryTimes++;						
+							
+							PostMethod post = new PostMethod("https://eapps.courts.state.va.us/gdcourts/caseSearch.do");
+							post.setRequestHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+						    post.setRequestHeader("Host", "eapps.courts.state.va.us");
+						    post.setRequestHeader("Referer", "https://eapps.courts.state.va.us/gdcourts/caseSearch.do?fromSidebar=true&searchLanding=searchLanding&searchType=hearingDate&searchDivision=V&searchFipsCode=" + parts[0]);
+						    
+						    post.setParameter("caseSearch", "Search");
+						    post.setParameter("firstName", "");
+						    post.setParameter("lastName", "");
+						    post.setParameter("middleName", "");
+						    post.setParameter("formAction", "");
+						    post.setParameter("searchCourtroom", "");
+						    post.setParameter("searchFipsCode", parts[0]);
+						    post.setParameter("searchHearingTime", "");
+						    post.setParameter("searchHearingType", "");						    
+						    post.setParameter("searchTerm", time);
+						    post.setParameter("searchUnitNumber", "");
+						    post.setParameter("suffix", "");
+							   
+						    try {
+						    	client.executeMethod(post);
+						    	html = getDataFromStream(post.getResponseBodyAsStream(), false);
+						    	if (html == null) {
+						    		logWritter.writeLine("Error on getting first page. Retrying...");
+						    		continue;
+						    	}
+						    	
+						    	String dataCheck = findInString(html, Pattern.compile("<input type=\"hidden\" name=\"searchFipsCode\" value=\"(.+?)\">"));
+						    	if (!dataCheck.equals(parts[0])) {
+						    		logWritter.writeLine("Error on data check on first page. Retrying...");
+						    		continue;
+						    	}
+							} catch (Exception e) {
+								System.err.println("Error fetching page. Retrying...");	
+								sleep(2000);
+								continue;
+							}					    
+						   
+						}
+						
+					//    System.out.println(html);
+					    
+					    writeCriminal(html, parts[0]);
+					    
+					    Matcher nextMatcher = nextPattern.matcher(html);
+				    	if (!nextMatcher.find()) {
+				    		cal.add(Calendar.DAY_OF_YEAR, -1);
+							startDate = cal.getTime();
+				    		continue; // nema vise
+				    	}
+				    	
+				    	sleep(2000);
+					    
+					    while (true) {
+					    	addTextToArea("Processing page " + pageCount++);
+					    	PostMethod post = new PostMethod("https://eapps.courts.state.va.us/gdcourts/caseSearch.do");
+							post.setRequestHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+						    post.setRequestHeader("Host", "eapps.courts.state.va.us");
+						    post.setRequestHeader("Referer", "https://eapps.courts.state.va.us/gdcourts/caseSearch.do");
+						    
+						    post.setParameter("caseInfoScrollForward", "Next");						    
+						    post.setParameter("firstName", "");
+						    post.setParameter("lastName", "");
+						    post.setParameter("middleName", "");
+						    post.setParameter("formAction", "");
+						    post.setParameter("searchCourtroom", "");
+						    post.setParameter("searchFipsCode", parts[0]);
+						    post.setParameter("searchHearingTime", "");
+						    post.setParameter("searchHearingType", "");						    
+						    post.setParameter("searchTerm", time);
+						    post.setParameter("searchUnitNumber", "");
+						    post.setParameter("suffix", "");
+						    post.setParameter("unCheckedCases", "");
+						    
+						    try {
+						    	 client.executeMethod(post);
+						    	 html = getDataFromStream(post.getResponseBodyAsStream(), false);
+						    	 if (html == null) {
+						    		 logWritter.writeLine("Error on getting page. Retrying...");
+						    		 continue;
+						    	 }
+						    	 
+						    	 String dataCheck = findInString(html, Pattern.compile("<input type=\"hidden\" name=\"searchFipsCode\" value=\"(.+?)\">"));
+							    	if (!dataCheck.equals(parts[0])) {
+							    		logWritter.writeLine("Error on data check on page. Retrying...");
+							    		continue;
+							    	}
+							} catch (Exception e) {
+								System.err.println("Error fetching page. Retrying...");
+								sleep(2000);
+								continue;
+							}					   
+						    
+						    writeCriminal(html, parts[0]);		    	
+					    	
+					    	nextMatcher = nextPattern.matcher(html);
+					    	if (!nextMatcher.find()) {
+					    		break; // nema vise
+					    	}
+					    	
+					    	sleep(4000);
+					    }
+					    
+					    cal.add(Calendar.DAY_OF_YEAR, -1);
+						startDate = cal.getTime();
+					}
+				    
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
+			}
+		
+	}	
+
+	private void extractData2() {	
+		
+		pProc.addPattern(2, Pattern.compile(">Filed Date\\&nbsp;:\\s*</td>\\s+.+?>\\&nbsp;(.+?)<"));		
+		
+	//	pProc.addReplacement(3, "\\&lt;", "<");
+	//	pProc.addReplacement(3, "\\&gt;", ">");
+		
+		for (String cityToProcess : citiesToProcess) {
+			String parts [] = cityToProcess.split("~");
+			addTextToArea("Starting scrape for " + parts[1]);
+			
+			
+			GetMethod get = new GetMethod("https://eapps.courts.state.va.us/gdcourts/caseSearch.do?fromSidebar=true&searchLanding=searchLanding&searchType=hearingDate&searchDivision=V&searchFipsCode=" + parts[0] + "&curentFipsCode=" + parts[0]);
+			get.setRequestHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+			get.setRequestHeader("Host", "eapps.courts.state.va.us");
+			get.setRequestHeader("Referer", "https://eapps.courts.state.va.us/gdcourts/changeCourt.do");			
+		
+			try {	
+				client.executeMethod(get);
+				get.releaseConnection();
+			//	System.out.println(get.getResponseBodyAsString());
+				
+				Calendar c = Calendar.getInstance();
+				c.add(Calendar.DAY_OF_YEAR, 90);
+				
+				Date startDate = c.getTime();
+				Date endDate = new Date();
+				
+				if (!this.startDate.trim().equals("")) {
+					startDate = sdf.parse(this.startDate);
+				}			
+				
+				while (startDate.after(endDate)) {		
+					
+					Calendar cal = Calendar.getInstance();
+					cal.setTime(startDate);
+					if (cal.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY || cal.get(Calendar.DAY_OF_WEEK) == Calendar.SATURDAY) {
+						cal.add(Calendar.DAY_OF_MONTH, -1);
+						startDate = cal.getTime();
+						continue;
+					}
+					
+					String time = sdf.format(startDate);
+					pProc.addData(10, time);
+					pageCount = 1;
+					
+					addTextToArea("Starting scrape for date " + time);	
+					addTextToArea("Processing page " + pageCount++);
+					
+					String html = "";
+					
+					int tryTimes = 0;
+					while (true) {
+						if (tryTimes == 5) break;
+						tryTimes++;						
+						
+						PostMethod post = new PostMethod("https://eapps.courts.state.va.us/gdcourts/caseSearch.do");
+						post.setRequestHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+					//	post.setRequestHeader("Accept-Encoding", "gzip, deflate");
+					//	post.setRequestHeader("Accept-Language", "sr,sr-rs;q=0.8,sr-cs;q=0.6,en-us;q=0.4,en;q=0.2");
+					//	post.setRequestHeader("Connection", "keep-alive");
+						post.setRequestHeader("Host", "eapps.courts.state.va.us");
+					    post.setRequestHeader("Referer", "https://eapps.courts.state.va.us/gdcourts/caseSearch.do?fromSidebar=true&searchLanding=searchLanding&searchType=hearingDate&searchDivision=V&searchFipsCode=" + parts[0] + "&curentFipsCode=" + parts[0]);
+					//    post.setRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:34.0) Gecko/20100101 Firefox/34.0");
+					    
+					    post.setParameter("caseSearch", "Search");
+					    post.setParameter("formAction", "");
+					    post.setParameter("searchCourtroom", "");
+					    post.setParameter("searchFipsCode", parts[0]);
+					    post.setParameter("searchHearingTime", "");
+					    post.setParameter("searchHearingType", "");
+					    post.setParameter("searchTerm", time);
+					    post.setParameter("curentFipsCode", parts[0]);
+						   
+					    try {
+					    	client.executeMethod(post);
+					    	html = getDataFromStream(post.getResponseBodyAsStream(), false);
+					    	if (html == null) {
+					    		logWritter.writeLine("Error on getting first page. Retrying...");
+					    		sleep(2000);
+					    		continue;
+					    	}
+					    	
+					    	String dataCheck = findInString(html, Pattern.compile("<input type=\"hidden\" name=\"searchFipsCode\" value=\"(.+?)\">"));
+					    	if (!dataCheck.equals(parts[0])) {
+					    		logWritter.writeLine("Error on data check on first page. Retrying...");
+					    		sleep(2000);
+					    		continue;
+					    	} else {
+					    		break;
+					    	}
+						} catch (Exception e) {
+							System.err.println("Error fetching page. Retrying...");	
+							sleep(2000);
+							continue;
+						}					    
+					   
+					}
+					
+	//			    System.out.println(html);
+				    
+				    write(html);
+				    
+				    Matcher nextMatcher = nextPattern.matcher(html);
+			    	if (!nextMatcher.find()) {
+			    		cal.add(Calendar.DAY_OF_YEAR, -1);
+						startDate = cal.getTime();
+			    		continue; // nema vise
+			    	}
+			    	
+			    	sleep(2000);
+				    
+				    while (true) {
+				    	addTextToArea("Processing page " + pageCount++);
+				    	PostMethod post = new PostMethod("https://eapps.courts.state.va.us/gdcourts/caseSearch.do");
+						post.setRequestHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+					    post.setRequestHeader("Host", "eapps.courts.state.va.us");
+					    post.setRequestHeader("Referer", "https://eapps.courts.state.va.us/gdcourts/caseSearch.do");
+					    
+					    post.setParameter("caseInfoScrollForward", "Next");
+					    post.setParameter("formAction", "");				
+					    post.setParameter("searchCourtroom", "");
+					    post.setParameter("searchFipsCode", parts[0]);
+					    post.setParameter("searchHearingTime", "");
+					    post.setParameter("searchHearingType", "");
+					    post.setParameter("searchTerm", time);
+					    post.setParameter("unCheckedCases", "");
+					    
+					    try {
+					    	 client.executeMethod(post);
+					    	 html = getDataFromStream(post.getResponseBodyAsStream(), false);
+					    	 if (html == null) {
+					    		 logWritter.writeLine("Error on getting page. Retrying...");
+					    		 sleep(2000);
+					    		 continue;
+					    	 }
+					    	 
+					    	 String dataCheck = findInString(html, Pattern.compile("<input type=\"hidden\" name=\"searchFipsCode\" value=\"(.+?)\">"));
+						    	if (!dataCheck.equals(parts[0])) {
+						    		logWritter.writeLine("Error on data check on page. Retrying...");
+						    		sleep(2000);
+						    		continue;
+						    	}
+						} catch (Exception e) {
+							System.err.println("Error fetching page. Retrying...");
+							sleep(2000);
+							continue;
+						}					   
+					    
+					    write(html);		    	
+				    	
+				    	nextMatcher = nextPattern.matcher(html);
+				    	if (!nextMatcher.find()) {
+				    		break; // nema vise
+				    	}
+				    	
+				    	sleep(4000);
+				    }
+				    
+				    cal.add(Calendar.DAY_OF_YEAR, -1);
+					startDate = cal.getTime();
+				}
+			    
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		}
+		
+	}
+
+	public static void main(String[] args) {
+		c = new Captcha2(false); // true - criminal, false - civil
+	}
+	
+	private String challenge = null;
+	
+	public void getCaptcha() {
+		try {
+			GetMethod get = new GetMethod("https://eapps.courts.state.va.us/gdcourts/captchaVerification.do");
+			get.setFollowRedirects(false);
+			
+		//	String location = "";
+			
+			client.executeMethod(get);
+
+//			for (Header h : get.getResponseHeaders()) {
+//				if (h.getName().contains("Location")) {
+//					location = h.getValue();
+//				}
+//			}
+			
+			get = new GetMethod("https://eapps.courts.state.va.us/gdcourts/captchaVerification.do?landing=landing");
+			client.executeMethod(get);
+			
+			get = new GetMethod("https://www.google.com/recaptcha/api/challenge?k=6LeBvd8SAAAAAM-adIY1HeyrNJMMPVHSFNPJYW9X");
+			get.setRequestHeader("Accept", "*/*");
+			get.setRequestHeader("Accept-Encoding", "gzip, deflate");	
+//			get.setRequestHeader("Cache-Control", "max-age=0");
+			get.setRequestHeader("Connection", "keep-alive");
+			get.setRequestHeader("Accept-Language", "sr,sr-rs;q=0.8,sr-cs;q=0.6,en-us;q=0.4,en;q=0.2");
+			get.setRequestHeader("Host", "www.google.com");
+			get.setRequestHeader("Referer", "https://eapps.courts.state.va.us/gdcourts/captchaVerification.do?landing=landing");			
+			get.setRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:38.0) Gecko/20100101 Firefox/38.0");
+			
+			HttpClient newClient = new HttpClient();
+			newClient.executeMethod(get);
+			
+			String res = getDataFromStream(get.getResponseBodyAsStream(), true);
+			challenge = findInString(res, Pattern.compile("challenge\\s+:\\s+'(.+?)'"));
+			
+			get = new GetMethod("https://www.google.com/recaptcha/api/reload?c=" + challenge  + "&k=6LeBvd8SAAAAAM-adIY1HeyrNJMMPVHSFNPJYW9X&lang=sr&reason=i&type=image");
+			get.setRequestHeader("Accept", "*/*");
+			get.setRequestHeader("Accept-Language", "sr,sr-rs;q=0.8,sr-cs;q=0.6,en-us;q=0.4,en;q=0.2");
+			get.setRequestHeader("Accept-Encoding", "gzip, deflate");			
+			get.setRequestHeader("Connection", "keep-alive");
+			get.setRequestHeader("Host", "www.google.com");
+			get.setRequestHeader("Referer", "https://eapps.courts.state.va.us/gdcourts/captchaVerification.do?landing=landing");
+			get.setRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:38.0) Gecko/20100101 Firefox/38.0");			
+
+			newClient.executeMethod(get);
+			
+			res = getDataFromStream(get.getResponseBodyAsStream(), true);
+			challenge = findInString(res, Pattern.compile("finish_reload\\('(.+?)'"));
+			
+			
+			get = new GetMethod("https://www.google.com/recaptcha/api/image?c=" + challenge);
+			get.setRequestHeader("Accept", "*/*");
+			get.setRequestHeader("Accept-Language", "sr,sr-rs;q=0.8,sr-cs;q=0.6,en-us;q=0.4,en;q=0.2");
+			get.setRequestHeader("Accept-Encoding", "gzip, deflate");			
+			get.setRequestHeader("Connection", "keep-alive");
+			get.setRequestHeader("Host", "www.google.com");
+			get.setRequestHeader("Referer", "https://eapps.courts.state.va.us/gdcourts/captchaVerification.do?landing=landing");
+			get.setRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:38.0) Gecko/20100101 Firefox/38.0");
+		   
+			newClient.executeMethod(get);
+
+		    BufferedImage im = ImageIO.read(get.getResponseBodyAsStream());
+		    ImageIcon icon = new ImageIcon(im);
+		    
+		    JLabel label = new JLabel(icon);
+		    label.setSize(300, 75);
+		    
+		    
+		    captchaPanel.add(label);
+		    captchaPanel.repaint();
+		
+		    
+		    
+		    
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+	
+	private boolean checkCaptcha() {
+		String response = captchaText.getText().trim();
+		startDate = startDateText.getText().trim();
+		endDate = endDateText.getText().trim();
+		
+		pProc = new PatternProcessor();		
+	    
+		try {		
+		    PostMethod post = new PostMethod("https://eapps.courts.state.va.us/gdcourts/captchaVerification.do");
+		    post.setFollowRedirects(false);
+		    
+		    post.setRequestHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+		    
+		    post.setRequestHeader("Accept-Encoding", "gzip, deflate");
+		    post.setRequestHeader("Accept-Language", "sr,sr-RS;q=0.8,sr-CS;q=0.6,en-US;q=0.4,en;q=0.2");
+		    post.setRequestHeader("Connection", "keep-alive");
+		    post.setRequestHeader("Host", "eapps.courts.state.va.us");
+		    post.setRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:38.0) Gecko/20100101 Firefox/38.0");
+		    post.setRequestHeader("Referer", "https://eapps.courts.state.va.us/gdcourts/captchaVerification.do?landing=landing");
+		    
+		    post.setParameter("accept", "Accept");
+		    post.setParameter("recaptcha_challenge_field", challenge);
+		    post.setParameter("pageName", "landingCaptchaVerificationPage");
+		    post.setParameter("showCaptcha", "true");
+		    post.setParameter("recaptcha_response_field", response);
+		    
+		    client.executeMethod(post);	 
+		    Utils.printHeaders(post.getResponseHeaders());
+		    System.out.println("==============");
+		    Utils.printHeaders(post.getRequestHeaders());
+		    
+		    String captchaResponse = post.getResponseBodyAsString();
+		    if (!captchaResponse.trim().equals("")) {
+		    	JOptionPane.showMessageDialog(null, "Captcha wrong! Try again.");
+		    	return false;
+		    }
+		    
+		    GetMethod get = new GetMethod("https://eapps.courts.state.va.us/gdcourts/caseSearch.do?welcomePage=welcomePage");
+		    get.setRequestHeader("Accept-Encoding", "gzip, deflate");
+		    get.setRequestHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+			get.setRequestHeader("Host", "eapps.courts.state.va.us");
+			get.setRequestHeader("Referer", "https://eapps.courts.state.va.us/gdcourts/captchaVerification.do");
+			
+			client.executeMethod(get);
+//			String html = getDataFromStream(get.getResponseBodyAsStream(), true);
+//			System.out.println(html);
+			loadCities(get);
+			return true;
+		
+		} catch (Exception e) {
+			e.printStackTrace();
+		}	
+		
+		return false;
+	}
+	
+	private String startDate;
+	private String endDate;
+	private String lastFilename;
+
+	@Override
+	public void run() {		
+		if (this.criminal) {
+			
+			pProc.addPattern(1, Pattern.compile(">Name&nbsp;:\\s*</td>\\s+.+?>\\&nbsp;(.+?)<"));
+			pProc.addPattern(2, Pattern.compile(">Address&nbsp;:\\s*</td>\\s+.+?>\\s+\\&nbsp;(.+?)\\s+<"));
+			pProc.addPattern(3, Pattern.compile(">Filed Date&nbsp;:\\s*</td>\\s+.+?>\\&nbsp;(.+?)<"));
+			pProc.addPattern(4, Pattern.compile(">Status&nbsp;:s*</td>\\s+.+?>\\&nbsp;(.+?)<"));
+			pProc.addPattern(5, Pattern.compile(">Charge&nbsp;:\\s*</td>\\s+.+?>\\&nbsp;(.+?)\\s+<"));
+			pProc.addPattern(6, Pattern.compile(">Offense Date&nbsp;:\\s*</td>\\s+.+?>\\&nbsp;(.+?)<"));
+			pProc.addPattern(7, Pattern.compile(">Case Type&nbsp;:\\s*</td>\\s+.+?>\\&nbsp;(.+?)<"));
+			pProc.addPattern(8, Pattern.compile(">Arrest Date&nbsp;:\\s*</td>\\s+.+?>\\&nbsp;(.+?)<"));
+			pProc.addPattern(9, Pattern.compile(">Sentence Time&nbsp;:\\s*</td>\\s+.+?>\\&nbsp;(.+?)<"));
+			
+			extractData();
+		} else {
+			extractData2();
+		}
+	//	extractData();
+	//	extractData2();
+		
+		saveNewCases();
+		writter.close();
+		textArea.append("FINISHED - Check file " + lastFilename);
+		textArea.append("\n");
+		textArea.setCaretPosition(textArea.getDocument().getLength());
+	}
+	
+	private void loadCities(GetMethod get) {
+		try {
+			String html = getDataFromStream(get.getResponseBodyAsStream(), true);
+			
+			String wrap = findInString(html, Pattern.compile("<table cellpadding=\"0\" cellspacing=\"0\">(.+?)<table cellpadding=\"0\" cellspacing=\"0\">", Pattern.DOTALL));
+			Pattern courtNamesP = Pattern.compile("<input type=\"hidden\" name=\"courtName\" value=\"(.+?)\" />");
+			Pattern courtCodeP = Pattern.compile("<input type=\"hidden\" name=\"courtFips\" value=\"(.+?)\" />");
+			
+			ArrayList<String> courtNames = findAllInString(wrap, courtNamesP);
+			ArrayList<String> courtCodes = findAllInString(wrap, courtCodeP);
+			
+			HashSet<String> courtsToExtract = new HashSet<String>();
+			courtsToExtract.addAll(Files.loadListFromFile("courts.txt"));
+			
+			for (int i = 0; i < courtNames.size(); i++) {
+				if (courtsToExtract.contains(courtNames.get(i))) {
+					citiesToProcess.add(courtCodes.get(i) + "~" + courtNames.get(i));
+				}
+			}
+			
+			
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+		
+	}
+	
+	private void writeCriminal(String data, String courtCode) {
+		ArrayList<String> wrappers = Patterns.findAllInString(data, wrapPattern);
+		
+		logWritter.writeLine("Found " + wrappers.size() + " cases");
+		
+		for (String wrap : wrappers) {
+			ArrayList<String> tds = Patterns.findAllInString(wrap, tdPattern);
+			
+			String caseNr = tds.get(1).replaceAll("<.+?>", "").trim();
+			String defendant = tds.get(2).replaceAll("<.+?>", "").trim();
+			String complainant = tds.get(3).replaceAll("<.+?>", "").trim();
+			String caseType = tds.get(4).replaceAll("<.+?>", "").trim();
+			String hearingTime = tds.get(5).replaceAll("<.+?>", "").trim();
+			
+			if (casesDB.contains(caseNr)) {
+				addTextToArea("\tCase " + caseNr + " is already in the database");
+				continue;
+			}
+			
+			if (plaintiffToSkip.contains(complainant)) {
+				addTextToArea("\tCase " + caseNr + " is skipped because of complainant");
+				continue;
+			}
+			
+			// ovo nam treba
+			boolean needed = false;
+			
+			for (String alowedCase : caseTypes) {
+				
+				if (alowedCase.contains("*")) {
+					if (alowedCase.trim().equals("*")) {
+						needed = true;
+						break;
+					}
+					alowedCase = alowedCase.substring(0, alowedCase.indexOf("*"));
+					if (caseType.contains(alowedCase)) {
+						needed = true;
+						break;
+					}
+				} else if (caseTypes.contains(caseType)){
+					needed = true;
+				}
+			}
+			
+			if (needed) {				
+				addTextToArea("\tFound new case " + caseNr + " with type " + caseType);
+			//	String caseData = fetchPageContent("http://epwsgdp1.courts.state.va.us/gdcourts2/caseSearch.do?formAction=caseDetails&displayCaseNumber=" + caseNr);
+				String caseData = getCaseData("https://eapps.courts.state.va.us/gdcourts/caseSearch.do?formAction=caseDetails&displayCaseNumber=" + caseNr + "&localFipsCode="+ courtCode +"&caseActive=true");
+			//	System.out.println(caseData);
+				
+			    String hearingInfo = findInString(caseData, hearingWrapP);
+				
+				StringBuilder hearings = new StringBuilder();
+				ArrayList<String> hearingTRs = findAllInString(hearingInfo, trPattern);
+				for (String hearingTR : hearingTRs) {
+					ArrayList<String> hearingTDs = findAllInString(hearingTR, td2Pattern);
+					if (hearingTDs.size() == 0) continue;
+					hearings.append(hearingTDs.get(0) + " " + hearingTDs.get(2)).append(";");
+				}
+				
+				pProc.addData(10, hearings.toString());
+				pProc.addData(11, caseNr);
+				String line = pProc.processPatterns(caseData, writter);
+				
+				newCases.add(line);
+			}	
+			
+			count++;
+			
+			
+		}
+		
+	}
+
+	@Override
+	public void write (String data) {
+		ArrayList<String> wrappers = Patterns.findAllInString(data, wrapPattern);
+		
+		logWritter.writeLine("Found " + wrappers.size() + " cases");
+		
+		for (String wrap : wrappers) {
+			ArrayList<String> tds = Patterns.findAllInString(wrap, tdPattern);
+			
+			String caseNr = tds.get(1).replaceAll("<.+?>", "").trim();
+			String defendant = tds.get(2).replaceAll("<.+?>", "").trim();
+			String plaintiff = tds.get(3).replaceAll("<.+?>", "").trim();
+			String caseType = tds.get(4).replaceAll("<.+?>", "").trim();
+			String hearingTime = tds.get(5).replaceAll("<.+?>", "").trim();
+			
+			if (casesDB.contains(caseNr)) {
+				addTextToArea("\tCase " + caseNr + " is already in the database");
+				continue;
+			}
+			
+			if (plaintiffToSkip.contains(plaintiff)) {
+				addTextToArea("\tCase " + caseNr + " is skipped because of plaintiff");
+				continue;
+			}
+			
+			// ovo nam treba
+			if (caseTypes.contains(caseType)) {
+				
+				addTextToArea("\tFound new case " + caseNr + " with type " + caseType);
+			//	String caseData = fetchPageContent("http://epwsgdp1.courts.state.va.us/gdcourts2/caseSearch.do?formAction=caseDetails&displayCaseNumber=" + caseNr);
+				String caseData = getCaseData("https://eapps.courts.state.va.us/gdcourts/caseSearch.do?formAction=caseDetails&displayCaseNumber=" + caseNr);
+				
+			    String plantifInfo = findInString(caseData, plantifWrapP);
+			    String defInfo = findInString(caseData, defendantWrapP);
+			    String hearingInfo = findInString(caseData, hearingWrapP);
+			    
+			    ArrayList<String> plantifTDs = findAllInString(plantifInfo, td2Pattern);
+			    ArrayList<String> defendantTDs = findAllInString(defInfo, td2Pattern);
+			    		
+			    pProc.addData(1, caseType);
+				pProc.addData(3, plaintiff);
+				pProc.addData(4, plantifTDs.size() > 2 ? plantifTDs.get(2).trim() : "");
+				pProc.addData(5, plantifTDs.size() > 4 ? plantifTDs.get(4).trim() : "");
+				
+				pProc.addData(6, defendant);
+				pProc.addData(7, defendantTDs.size() > 2 ? defendantTDs.get(2).trim() : "");
+				pProc.addData(8, defendantTDs.size() > 4 ? defendantTDs.get(4).trim() : "");
+				
+				StringBuilder hearings = new StringBuilder();
+				ArrayList<String> hearingTRs = findAllInString(hearingInfo, trPattern);
+				for (String hearingTR : hearingTRs) {
+					ArrayList<String> hearingTDs = findAllInString(hearingTR, td2Pattern);
+					if (hearingTDs.size() == 0) continue;
+					hearings.append(hearingTDs.get(0) + " " + hearingTDs.get(2)).append(";");
+				}
+				
+				pProc.addData(9, hearings.toString());
+				pProc.addData(11, caseNr);
+				String line = pProc.processPatterns(caseData, writter);
+				
+				newCases.add(line);
+			}	
+			
+			count++;
+			
+			
+		}
+	}
+	
+	private String getCaseData(String url) {
+		int tryCount = 0;
+		while (true) {
+			if (tryCount == 5) break;
+			tryCount++;
+			
+			try {
+				GetMethod newGet = new GetMethod(url);
+			    client.executeMethod(newGet);
+			    
+			    String html = getDataFromStream(newGet.getResponseBodyAsStream(), false);
+			    if (html == null) {
+			    	sleep(2000);
+			    	continue;
+			    }
+			    
+			    return html;
+			} catch (Exception e) {
+				e.printStackTrace();
+				sleep(2000);
+				continue;
+			}
+		}
+		
+		
+		return null;
+	}
+	
+	private void addTextToArea(String text) {
+		textArea.append(text);
+		textArea.append("\n");
+		textArea.setCaretPosition(textArea.getDocument().getLength());
+		logWritter.writeLine(text);
+	}
+	
+	
+	private void saveNewCases() {
+		try {
+        	BufferedWriter out = new BufferedWriter(new FileWriter("cases.db", true));
+        	
+        	for (String caseE : newCases) {
+        		out.write(caseE);
+        		out.newLine();
+        	}
+        	
+        	out.flush();
+        	out.close();
+        	newCases.clear();
+        } catch (Exception e) {
+        	e.printStackTrace();
+        }
+	}
+	
+}
+
+

@@ -1,0 +1,142 @@
+package bots;
+
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.net.URLEncoder;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.regex.Pattern;
+import java.util.zip.GZIPInputStream;
+
+import org.apache.commons.httpclient.DefaultHttpMethodRetryHandler;
+import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.HttpMethod;
+import org.apache.commons.httpclient.cookie.CookiePolicy;
+import org.apache.commons.httpclient.methods.GetMethod;
+import org.apache.commons.httpclient.params.HttpMethodParams;
+
+import util.Utils;
+import util.Writter;
+import master.Master;
+import util.Files;
+
+public class Brandtech extends Master{
+
+	private ArrayList<String> linksToProccess;
+	private String html;
+	private Pattern detailPagePattern;
+	private ArrayList<String> detailLinks;
+	private HashSet<String> linkSet;
+	private String detHtml;
+
+	public Brandtech() {
+		
+		detailPagePattern = Pattern.compile("<a href='(prodpage\\.asp.+?)'");
+		
+	}
+	
+	public void run() {
+		
+		fetchPageContent("http://www.brandtech.com/");
+		
+		int count = 0;
+			
+		linksToProccess = Files.loadListFromFile("brandTech.txt");
+		
+		for(String link : linksToProccess) {
+			
+			
+			
+			html = fetchPageContent(link);
+		//	System.out.println(html);
+			
+			detailLinks = findAllInString(html, detailPagePattern);
+			linkSet = new HashSet<String>();
+			linkSet.addAll(detailLinks);
+			System.out.println(linkSet.size());
+			
+			for(String detLink : linkSet) {
+				
+				count++;
+			//	if (count < 31) continue;
+				
+			//	detLink = "prodpage.asp?prodid=BRAND® Pipette Tips for Air Displacement Pipettes Using 5mL and 10mL Pipette Tips";
+				detLink = detLink.replaceAll("\\s+", "%20").replaceAll("®", "%AE");
+				
+				
+				GetMethod get = new GetMethod("http://www.brandtech.com/" + detLink);
+				
+				get.setRequestHeader("Host", "www.brandtech.com");
+				get.setRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:42.0) Gecko/20100101 Firefox/42.0");
+				get.setRequestHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+				get.setRequestHeader("Accept-Encoding", "gzip, deflate");
+				get.setRequestHeader("Accept-Language", "sr,sr-RS;q=0.8,sr-CS;q=0.6,en-US;q=0.4,en;q=0.2");
+				get.setRequestHeader("Connection", "keep-alive");
+				get.setRequestHeader("Referer", "http://www.brandtech.com/lh_index.asp");
+				get.setRequestHeader("Cookie", "__utmz=245179094.1447282315.1.1.utmccn=(direct)|utmcsr=(direct)|utmcmd=(none); ASPSESSIONIDASTBSTSC=IACALDEBFKPONHIDGJBEDAAE; ASPSESSIONIDAQRCBQDC=PPKJGCKBFNOGLBJJDNBHEHKA; ASPSESSIONIDSQTQTDSQ=ADHLCOEBAEPBFFLANDDDGIAJ; __utma=245179094.1212748430.1447282315.1447312364.1447314548.3; __utmc=245179094; X-Mapping-gjaeaiji=45E1D8AD776FEF90EA2DC98C10371BAA; ASPSESSIONIDSSQSSDTS=KKHPAKBCECLFPGFCLCEDEMPF; __utmb=245179094");
+				
+				try {
+					Thread.sleep(10000);
+					httpClient.executeMethod(get);
+				} catch (Exception e) {
+					// TODO: handle exception
+				}
+				
+				
+				detHtml = Utils.getHtml(get);
+				
+				writter = new Writter("csvs/" + System.currentTimeMillis() + ".html");
+				writter.write(detHtml);
+			}
+		}
+		
+	}
+	
+	
+	public void write(String data) {
+		
+	}
+	
+	public String fetchPageContent(String fromPage) {
+		
+		
+		try {
+			Thread.sleep(5000);
+			if (httpClient == null) {
+				httpClient = new HttpClient();
+				httpClient.getHttpConnectionManager().getParams().setConnectionTimeout(60000); 
+				httpClient.getHttpConnectionManager().getParams().setSoTimeout(60000);
+				httpClient.getParams().setParameter("http.protocol.single-cookie-header", true);
+				httpClient.getParams().setCookiePolicy(CookiePolicy.BROWSER_COMPATIBILITY);
+			}
+			
+			GetMethod get = new GetMethod(fromPage);
+			
+			get.setRequestHeader("Host", "www.brandtech.com");
+			get.setRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:42.0) Gecko/20100101 Firefox/42.0");
+			get.setRequestHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+			get.setRequestHeader("Accept-Encoding", "gzip, deflate");
+			get.setRequestHeader("Accept-Language", "sr,sr-RS;q=0.8,sr-CS;q=0.6,en-US;q=0.4,en;q=0.2");
+			get.setRequestHeader("Connection", "keep-alive");
+			get.setRequestHeader("Cache-Control", "max-age=0");
+			get.setRequestHeader("Upgrade-Insecure-Requests", "1");			
+			
+			System.out.println(fromPage);
+			
+			httpClient.executeMethod(get);
+			
+		//	get.releaseConnection();
+			
+			return Utils.getHtml(get);			
+		} catch (Exception e) {			
+			System.err.println("#### GREŠKA ZA: " + fromPage + " ####");
+			e.printStackTrace();			
+			return null;
+		}
+	}
+	
+	public static void main(String[] args) {
+		new Brandtech().run();
+	}
+
+}

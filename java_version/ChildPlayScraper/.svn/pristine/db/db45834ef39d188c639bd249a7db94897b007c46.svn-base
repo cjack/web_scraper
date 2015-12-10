@@ -1,0 +1,101 @@
+package bots;
+
+import master.Master;
+import util.*;
+
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.util.regex.Pattern;
+import java.util.zip.GZIPInputStream;
+import java.util.*;
+
+import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.methods.GetMethod;
+
+public class Hotels extends Master {
+
+	public Hotels(Integer firstPage, Integer lastPage) {		
+		this();
+		firstPageNumber = firstPage;
+		lastPageNumber = lastPage;
+	}
+	
+	public Hotels() {		
+		
+		writter = new Writter("Hotel_Links.txt");
+	}	
+
+	public static void main(String[] args) {
+		if (args.length == 2) {
+			new Hotels(Integer.parseInt(args[0]), Integer.parseInt(args[1])).start();
+		} else {
+			new Hotels().start();
+		}
+		
+	}
+	
+	private Pattern patWrap = Pattern.compile("<ul id=\"hotel_index_list\">(.+?)</ul", Pattern.DOTALL);
+	private Pattern hotelLInkPat = Pattern.compile("<li><a href=\"(.+?)\"");
+	
+	@Override
+	public void run() {
+		for (int i = 1; i <=1992; i++) {
+			String pageLevel3 = fetchPageContent("http://www.hotels.com/hi3-p"+i+"/hotel-index-level-3-page-"+i+"/");
+			System.out.println("Processing: " + "http://www.hotels.com/hi3-p"+i+"/hotel-index-level-3-page-"+i+"/");
+			
+			String wrap = findInString(pageLevel3, patWrap);
+			
+			ArrayList<String> links = findAllInString(wrap, hotelLInkPat);
+			
+			for (String link : links) {
+				writter.writeLine(link);
+			}
+			
+			sleep(5000);
+			
+		}
+	}
+	
+	@Override
+	public void write (String data) {
+		
+	}
+	
+	public String fetchPageContent(String fromPage) {
+		try {
+			if (httpClient == null) {
+				httpClient = new HttpClient();
+			}
+			
+			GetMethod get = new GetMethod(fromPage);
+			
+			get.setRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:37.0) Gecko/20100101 Firefox/37.0");
+			get.setRequestHeader("Host", "www.hotels.com");
+			get.setRequestHeader("Cookie", "SSLB=1; AFFLB=B");
+			get.setRequestHeader("Accept-Encoding", "gzip, deflate");
+			get.setRequestHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+			get.setRequestHeader("Connection", "keep-alive");			
+			
+			httpClient.executeMethod(get);
+			
+			StringBuilder sb = new StringBuilder();
+			String line;
+			BufferedReader in = new BufferedReader(new InputStreamReader(new GZIPInputStream(get.getResponseBodyAsStream())));
+			while ((line = in.readLine()) != null) {
+				sb.append(line).append("\n");
+			}
+			
+			in.close();
+			get.releaseConnection();
+						
+			return sb.toString();			
+		} catch (Exception e) {
+			System.err.println("#### GREŠKA ZA: " + fromPage + " ####");
+			e.printStackTrace();			
+			return null;
+		}
+	}
+	
+}
+
+

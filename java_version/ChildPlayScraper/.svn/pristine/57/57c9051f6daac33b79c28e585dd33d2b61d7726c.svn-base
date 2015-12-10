@@ -1,0 +1,105 @@
+package bots;
+
+import master.Master;
+import util.*;
+
+import java.util.regex.Pattern;
+import java.util.*;
+
+import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.methods.GetMethod;
+
+
+public class Houzz extends Master {
+	
+	private EmailFinder eFinder;
+
+	public Houzz(Integer firstPage, Integer lastPage) {		
+		this();
+		firstPageNumber = firstPage;
+		lastPageNumber = lastPage;
+	}
+	
+	public Houzz() {		
+		httpClient = new HttpClient();
+		eFinder = new EmailFinder();
+		pProc = new PatternProcessor();
+		writter = new Writter("houzz_output.csv");
+		writter.writeLine("Business name,Address,City,State,Zipcode,Phone,E mail,Website");
+		
+		firstPageNumber = 210;
+		pageIncrement = 15;
+		
+		paginationPattern = Pattern.compile("navigation-button next");
+		
+		detailsPagePattern = Pattern.compile("<div class=\"pro-cover-photos\"><a  href='(http://www.houzz.com/.+?)'");
+		
+		pProc.addPattern(1, Pattern.compile("class=\"profile-full-name\".+?>(.+?)<"));
+		pProc.addPattern(2, Pattern.compile("itemprop=\"streetAddress\">(.+?)<"));
+		pProc.addPattern(3, Pattern.compile("itemprop=\"addressLocality\"><.+?>(.+?)<"));
+		pProc.addPattern(4, Pattern.compile("itemprop=\"addressRegion\">(.+?)<"));
+		pProc.addPattern(5, Pattern.compile("itemprop=\"postalCode\">(.+?)<"));
+		pProc.addPattern(6, Pattern.compile("class=\"pro-contact-text\">(.+?)<"));
+	//	pProc.addData(7, "");
+		
+	}	
+
+	public static void main(String[] args) {
+		if (args.length == 2) {
+			new Houzz(Integer.parseInt(args[0]), Integer.parseInt(args[1])).start();
+		} else {
+			new Houzz().start();
+		}
+		
+	}
+
+	@Override
+	public void run() {
+//		incrementPartOneURL = "http://www.houzz.com/professionals/interior-designer/dallas/p/";
+//		typeOneProcessing();
+//		
+//		firstPageNumber = 0;
+//		incrementPartOneURL = "http://www.houzz.com/professionals/kitchen-and-bath-remodelers/dallas/p/";
+//		typeOneProcessing();
+		
+		firstPageNumber = 0;
+		incrementPartOneURL = "http://www.houzz.com/professionals/interior-designer/charlotte/p/";
+		typeOneProcessing();
+	}
+	
+	private Pattern websiteLinkPattern = Pattern.compile("<a href=\"(.+?)\" compid=\"Profile_Website\" target=\"_blank\">");
+	
+	@Override
+	public void write (String data) {
+		pProc.addData(7, "");
+		String websiteLink = findInString(data, websiteLinkPattern);
+		if (!websiteLink.equals("")) {
+			GetMethod get = new GetMethod(websiteLink);
+			get.setFollowRedirects(false);
+			
+			try {
+				httpClient.executeMethod(get);
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+			
+			String location = get.getResponseHeader("Location").getValue();
+			pProc.addData(8, location);
+			
+			String eMail = eFinder.findEmail(location);
+			if (eMail != null) {
+				pProc.addData(7, eMail);
+			} else {
+				pProc.addData(7, "");
+			}
+		} else {
+			pProc.addData(7, "");
+			pProc.addData(8, "");
+		}	
+		
+		pProc.processPatterns(data, writter);
+	}
+	
+}
+
+

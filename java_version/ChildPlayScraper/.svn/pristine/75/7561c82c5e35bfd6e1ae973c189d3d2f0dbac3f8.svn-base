@@ -1,0 +1,459 @@
+package bots;
+
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.io.PrintWriter;
+import java.net.URL;
+import java.sql.DriverManager;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.zip.GZIPInputStream;
+
+import org.apache.commons.httpclient.Header;
+import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.methods.GetMethod;
+import org.apache.commons.httpclient.methods.PostMethod;
+import org.apache.commons.httpclient.protocol.Protocol;
+
+import loaders.PropertiesLoader;
+import master.Master;
+import util.DBWorks;
+import util.MySSLSocketFactory;
+import util.Sha1Hash;
+import util.Utils;
+
+public class Sambro extends Master {
+	
+	private PrintWriter csvOut;
+	private BufferedWriter txtOut;
+	private BufferedWriter amazonOut;
+	
+	private ArrayList<String> categories;
+	private HttpClient client = null;
+	private Pattern catAndSubPattern;
+	private Pattern nameAndSKUPattern;
+	private Pattern barcodePattern;
+	private Pattern pricePattern;
+	private Pattern descriptionPattern;
+	private Pattern imagePattern;
+	private Pattern piecesPerCartPatt;
+	private Pattern cartonNumPatt;
+	private Pattern barcodesPattern;
+	private Pattern brandPattern;
+	
+	private String cookie;
+	private Pattern catWrapPat;
+	private PrintWriter sambroOut;
+
+	public Sambro()	{
+		super("sambro");
+	//	PropertiesLoader.init("sambro.txt");
+	//	initDatabase();
+		initWritters();
+	//	DBWorks.init("psytoday");
+		
+		firefoxMask = true;
+		recordCount = 1;
+		requestDelay = 2000;
+		
+		login();
+		
+		java.util.logging.Logger.getLogger("org.apache.http.wire").setLevel(java.util.logging.Level.FINEST);
+		java.util.logging.Logger.getLogger("org.apache.http.headers").setLevel(java.util.logging.Level.FINEST);
+		System.setProperty("org.apache.commons.logging.Log", "org.apache.commons.logging.impl.SimpleLog");
+		System.setProperty("org.apache.commons.logging.simplelog.showdatetime", "true");
+		System.setProperty("org.apache.commons.logging.simplelog.log.httpclient.wire", "ERROR");
+		System.setProperty("org.apache.commons.logging.simplelog.log.org.apache.http", "ERROR");
+		System.setProperty("org.apache.commons.logging.simplelog.log.org.apache.http.headers", "ERROR");
+		
+		detailsPagePattern = Pattern.compile("<h2 class=\"product-name\"><a href=\"(.+?)\"");
+		
+		catWrapPat = Pattern.compile("<a href=\"http://www.sambro.co.uk/categories.html\" title=\"\">Categories</a>(.+?)<li class=\"product\">", Pattern.DOTALL);
+		catAndSubPattern = Pattern.compile("li class=\"category\\d{4}\">\\s+.+?>(.+?)<", Pattern.DOTALL);
+		brandPattern = Pattern.compile("Brand</th>\\s+.+?>(.+?)</td>");
+		nameAndSKUPattern = Pattern.compile("<div class=\"product-name\">\\s+<h1>(.+?)</h1>\\s+<p>(.+?)</p>");
+		barcodesPattern = Pattern.compile("Bar Codes</th>\\s+.+?>(.+?</td>)", Pattern.DOTALL);
+		barcodePattern = Pattern.compile("(.+?)<");
+		pricePattern = Pattern.compile("<span class=\"regular-price\".+?price\">(.+?)<");
+		descriptionPattern = Pattern.compile("product-description.+?<div>(.+?)</div>", Pattern.DOTALL);
+		imagePattern = Pattern.compile("data-image=\"(.+?)\"");
+		
+		piecesPerCartPatt = Pattern.compile("Pieces per Carton: <span>(.+?)</span>");
+		cartonNumPatt = Pattern.compile("Cartons In Stock: <span>(.+?)</span>");
+	}
+	
+	private void login() {
+		try {
+			Protocol.registerProtocol("https", 	new Protocol("https", new MySSLSocketFactory(), 443));
+			
+			client = new HttpClient();
+			System.out.print("Loginig in... ");
+						
+			GetMethod get = new GetMethod("https://www.sambro.co.uk/customer/account/login/");
+			
+			get.setRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:31.0) Gecko/20100101 Firefox/31.0");
+			client.executeMethod(get);
+			
+			
+			PostMethod post = new PostMethod("https://www.sambro.co.uk/customer/account/loginPost/");
+			post.setFollowRedirects(false);
+			post.setParameter("login[password]", "f3rrar1");
+			post.setParameter("login[username]", "princejames11@gmail.com");
+			post.setParameter("send", "");
+			
+			post.setRequestHeader("Host", "www.sambro.co.uk");
+			post.setRequestHeader("Referer", "https://www.sambro.co.uk/customer/account/login/");
+			post.setRequestHeader("Content-Length", "79");
+			
+			client.executeMethod(post);		
+			
+			for (Header h : post.getResponseHeaders()) {
+			//	System.out.println(h.getName() + " - " + h.getValue());
+				if (h.getValue().contains("frontend")) {
+					cookie = h.getValue() + "; currency=GBP";
+				}
+			}
+			
+			get = new GetMethod("https://www.sambro.co.uk/customer/account/");
+			get.setRequestHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+			get.setRequestHeader("Host", "www.sambro.co.uk");
+			get.setRequestHeader("Connection", "keep-alive");
+			get.setRequestHeader("Accept-Language", "en-US,en;q=0.5");
+			get.setRequestHeader("Content-Encoding", "gzip, deflate");
+			get.setRequestHeader("Referer", "https://www.sambro.co.uk/customer/account/login/");
+			get.setRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:31.0) Gecko/20100101 Firefox/31.0");
+			
+			client.getState().clearCookies();
+			get.setRequestHeader("Cookie", cookie);
+			client.executeMethod(get);
+			
+//			System.out.println("Req Headers");
+//			for (Header h : get.getRequestHeaders()) {
+//				System.out.println(h.getName() + " - " + h.getValue());
+//			}
+//			
+//			for (Header h : get.getResponseHeaders()) {
+//				System.out.println(h.getName() + " - " + h.getValue());
+//			}
+			
+			StringBuilder sb = new StringBuilder();
+			BufferedReader in = new BufferedReader(new InputStreamReader(get.getResponseBodyAsStream()));
+			String line = null;
+			
+			while ((line = in.readLine()) != null) {
+				sb.append(line);
+				sb.append("\n");
+			}
+			
+			in.close();
+			
+		//	System.out.println(sb.toString());
+			System.out.println("done");
+			
+			System.out.print("Getting categories...");
+			categories = new ArrayList<String>();
+			categories = findAllInString(sb.toString(), Pattern.compile("<a href=\"(http://www.sambro.co.uk/categories/[\\w|-]+/[^/]+html)\""));
+			
+			System.out.println("done");
+		//	System.exit(0);
+			
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+		
+	}
+
+	private void initWritters() {
+		try {
+			csvOut = new PrintWriter(new OutputStreamWriter(new FileOutputStream("../SambroAmazonFormat.csv"), "UTF-8"));
+			csvOut.print("Category1,Category2,Category3,Category4,Category5,SubCategory,Product Name,ASIN#,Barcode,Price,Manufacturer,Review Score,Reviews#,Amazon Rank,Description,Image1,Image2,Image3,Image4,Image5");
+			csvOut.print("\n");
+			
+			sambroOut = new PrintWriter(new OutputStreamWriter(new FileOutputStream("sambro.csv"), "UTF-8"));
+			sambroOut.print("Category1,Category2,Category3,Category4,Category5,SubCategory,Product Name,ASIN#,Barcode,Price,Manufacturer,Review Score,Reviews#,Amazon Rank,Description,Image1,Image2,Image3,Image4,Image5");
+			sambroOut.print("\n");
+			
+			txtOut = new BufferedWriter(new FileWriter("channelmax-ftp-jamesutility.txt"));
+			txtOut.write("SKU\tProduct Name\tMax Selling Price\tQuantity\tEAN\tManufacturer Name\tTitle\tCategory1");
+			txtOut.newLine();
+			
+			amazonOut = new BufferedWriter(new FileWriter("amazon.txt"));
+						
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+	}
+	
+	private void writeLine(PrintWriter out, String text) {
+		try {
+			
+			out.println(text);
+		//	out.print("\n");
+			out.flush();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+	
+	private void writeLine(BufferedWriter out, String text) {
+		try {
+			out.write(text);
+			out.newLine();
+			out.flush();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+	
+	private void writeSpecs(String doctor, ArrayList<String> specs, BufferedWriter out) {
+		for (String spec : specs) {
+			writeLine(out, formatValue(doctor) + formatValueWithoutAppend(spec));
+		}
+	}
+
+	public void write(String pageHtml, String hash) {
+		
+		String catsWrap = findInString(pageHtml, catWrapPat);
+		ArrayList<String> cats = findAllInString(catsWrap, catAndSubPattern);
+		String nameAndSku [] = findGroupsInString(pageHtml, nameAndSKUPattern, 2);
+		String price = findInString(pageHtml, pricePattern).replaceAll("[^0-9\\.]", "");
+		ArrayList<String> images = findAllInString(pageHtml, imagePattern);
+		String brand = findInString(pageHtml, brandPattern);
+		String barcodes = findInString(pageHtml, barcodesPattern);
+		String barcode = "";
+		ArrayList<String> barcodesList = findAllInString(barcodes, barcodePattern);
+		
+		if (barcodesList.size() != 0) {
+			for (String bc : barcodesList) {
+				if (!bc.contains("OUTER")) {
+					barcode = bc;
+					break;
+				}
+			}
+		}
+		
+		if (barcode.contains("-")) {
+			barcode = barcode.substring(0, barcode.indexOf("-"));
+		}
+		
+		if (barcode.contains(" ")) {
+			barcode = barcode.substring(0, barcode.indexOf(" "));
+		}
+		
+		barcode = barcode.replaceAll("[^0-9]", "");
+		
+		String description = findInString(pageHtml, descriptionPattern);
+		
+		String cartons = findInString(pageHtml, cartonNumPatt).replaceAll("[^0-9]", "");
+		String piecesPerCarton = findInString(pageHtml, piecesPerCartPatt).replaceAll("[^0-9]", "");
+		
+		int totalCount = 0;
+		if (!cartons.equals("") && !piecesPerCarton.equals("")) {
+			totalCount = Integer.parseInt(cartons) * Integer.parseInt(piecesPerCarton);
+		} 
+		
+		if (cats == null || nameAndSku == null) return;
+		
+		StringBuilder csv = new StringBuilder();
+		csv.append(formatValue(cats.get(0))).append("\"\",\"\",\"\",\"\",").append(formatValue(cats.get(1))).append(formatValue(nameAndSku[0])).append(formatValue(nameAndSku[1])).append("="+formatValue(barcode)).append("="+formatValue(price)).append("\"\",\"\",\"\",\"\",");
+		csv.append(formatValue(description));
+		
+		StringBuilder txt = new StringBuilder();
+		txt.append(nameAndSku[1] + "\t").append(nameAndSku[0] + "\t").append(price + "\t").append(Integer.toString(totalCount) + "\t").append(barcode + "\t").append("\t").append(nameAndSku[0] + "\t").append(cats.get(1));
+		
+		for (String image : images) {
+			csv.append(formatValue(image));
+		}
+		
+		csv.deleteCharAt(csv.length()-1);
+		
+		writeLine(csvOut, csv.toString());
+		writeLine(sambroOut, csv.toString());
+		writeLine(txtOut, txt.toString());
+		
+		
+		StringBuilder amazon = new StringBuilder();
+		amazon.append(formatValue(nameAndSku[1])).append(formatValue(nameAndSku[0])).append("="+formatValue(barcode)).append(formatValue("ean")).append(formatValue("ToysAndGames")).append(formatValue(brand)).append(formatValue(brand));
+		amazon.append("="+formatValue(barcode)).append(formatValue(description)).append(formatValue("Update")).append(formatValue("1")).append("="+formatValue(price)).append(formatValue("GBP")).append(formatValue("New")).append(",").append(formatValue("06/30/2014")).append(formatValueWithoutAppend(images.size()>0?images.get(0):""));
+		
+		System.out.println(amazon);
+		writeLine(amazonOut, amazon.toString());
+	}
+	
+	private void initDatabase() {
+		try {
+			if (connection == null) {
+				Class.forName("com.mysql.jdbc.Driver");
+				connection = DriverManager.getConnection("jdbc:mysql://" + PropertiesLoader.readBaseLocation + "/"+PropertiesLoader.dbname+"?characterEncoding=UTF-8", PropertiesLoader.username,
+						PropertiesLoader.password);
+			}
+			statement = connection.createStatement();
+					
+		} catch (Exception e) {
+			e.printStackTrace();
+			lastPageNumber = -1;
+			errorCount = 5;
+		}
+		
+	}
+	
+	protected void typeOneProcessing() {
+		
+		paginationURL = null;
+		detailsPageURL = null;
+		String pageHtml = null;
+		String detailsPageHtml = null;
+		String detailsPageHash = null;
+		
+		int errorDelay = initialErrorDelay;
+
+		Matcher paginationMatcher;
+		Matcher urlMatcher;
+		HashSet<String> pageURLs = new HashSet<String>();
+
+		for (String category : categories) {
+			category = category + "?limit=270";
+			pageHtml = fetchPageContent(category);
+			
+			System.out.println("Category: " + category);
+
+			if (pageHtml != null) {
+				System.out.println("-Pagination page: " + category);
+				errorCount = 0;
+				errorDelay = initialErrorDelay;
+				urlMatcher = detailsPagePattern.matcher(pageHtml);
+				 
+				while (urlMatcher.find()) {
+					detailsPageURL = urlMatcher.group(1);
+					detailsPageURL = detailsPageURL.toLowerCase();
+
+					System.out.print("\t"+ recordCount + ". " + detailsPageURL);
+					
+					detailsPageHash = Sha1Hash.SHA1(detailsPageURL);
+
+					if (pageURLs.contains(detailsPageHash)) {
+						continue;
+					} else {
+						pageURLs.add(detailsPageHash);
+					}
+					
+					// test for duplicate url
+//					if (DBWorks.containsUrl(detailsPageHash)) {
+//					//	DBWorks.updateTime(detailsPageHash);
+//						System.out.println(" - UPDATED");
+//						recordCount++;
+//						updatedRecordsCount++;
+//						continue;
+//					}
+
+					detailsPageHtml = fetchPageContent(detailsPageURL);
+				//	detailsPageHtml = fetchPageContent("http://www.sambro.co.uk/transformers-revenge-of-the-fallen-bumper-activity.html");
+					
+					System.out.println(" - NEW");
+					if (detailsPageHtml != null) {
+						write(detailsPageHtml, detailsPageHash);
+						recordCount++;
+						newRecordsCount++;
+					}
+					
+					sleep(requestDelay);
+				}
+			} else {
+				errorCount++;
+				if (errorCount == 5) {
+					break;
+				}				
+				
+				sleep(errorDelay);
+				errorDelay *= 5;				
+			}
+			if (stopped) {
+				break;
+			}
+		}
+	}	
+
+	public static void main(String[] args) {
+		
+		new Sambro().run();
+	}
+	
+	public String fetchPageContent(String fromPage) {
+		try {
+			
+			GetMethod get = new GetMethod(fromPage);
+			client.executeMethod(get);
+			
+			StringBuilder sb = new StringBuilder();
+			String line;
+			BufferedReader in = new BufferedReader(new InputStreamReader(get.getResponseBodyAsStream()));
+			while ((line = in.readLine()) != null) {
+				sb.append(line).append("\n");
+			}
+			
+			in.close();
+			get.releaseConnection();
+			
+			return sb.toString();			
+		} catch (Exception e) {
+			System.err.println("#### GREŠKA ZA: " + fromPage + " ####");
+			e.printStackTrace();			
+			return null;
+		}
+	}
+
+	@Override
+	public void run() {
+		typeOneProcessing();
+		
+		processingEnd();
+	}
+	
+	public void processingEnd() {
+		try {
+			csvOut.close();
+			txtOut.close();
+			amazonOut.close();
+			
+			copyFileUsingStream(new File("sambro.csv"), new File("../sambro.csv"));
+			copyFileUsingStream(new File("channelmax-ftp-jamesutility.txt"), new File("../channelmax-ftp-jamesutility.txt"));
+		} catch (Exception e) {
+			// TODO: handle exception
+		}
+		System.out.println("Crawl finished!");
+	}
+	
+	private static void copyFileUsingStream(File source, File dest) throws IOException {
+	    InputStream is = null;
+	    OutputStream os = null;
+	    try {
+	        is = new FileInputStream(source);
+	        os = new FileOutputStream(dest);
+	        byte[] buffer = new byte[1024];
+	        int length;
+	        while ((length = is.read(buffer)) > 0) {
+	            os.write(buffer, 0, length);
+	        }
+	    } finally {
+	        is.close();
+	        os.close();
+	    }
+	}
+	
+		
+}
+
+

@@ -1,0 +1,203 @@
+package bots;
+
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import util.Utils;
+
+import util.PatternProcessor;
+import util.Sha1Hash;
+import util.Writter;
+
+import master.Master;
+
+public class Archionweb extends Master{
+
+	private Pattern compArichPattern;
+	private Writter writterArch;
+	private Writter writterComp;
+	private PatternProcessor pProcA;
+	private PatternProcessor pProcC;
+	private Pattern associesPattern;
+	private Pattern assocPattern;
+	private Pattern associesWrapPattern;
+	private ArrayList<String> associes;
+
+	public Archionweb() {
+		
+		writterArch = new Writter("architect.csv");
+		writterArch.writeLine("CIVILITE,NOM,PRENOM,INSCRIT AU CONSEIL DE,RUE N° BOÎTE,CODE POSTAL & VILLE,TÉLÉPHONE,EMAIL,SITE WEB");
+		
+		writterComp = new Writter("company.csv");
+		writterComp.writeLine("FORME,NOM DE LA SOCIÉTÉ,INSCRIT AU TABLEAU DE,RUE  N° BOÎTE,CODE POSTAL & VILLE,TÉLÉPHONE,EMAIL,SITE WEB,ASSOCIÉS");
+		
+		pProcA = new PatternProcessor();
+		pProcC = new PatternProcessor();
+		
+		baseURL = "https://www.archionweb.be";
+		
+		paginationPattern = Pattern.compile("Suivante&nbsp;»");		
+		detailsPagePattern = Pattern.compile("<tr><td><a href=\"(/Public/.+?)\">.+?</a>");
+		
+		compArichPattern = Pattern.compile("Public/(.+?)/");
+	
+		firstPageNumber = 0;
+		pageIncrement = 1;
+		
+		incrementPartOneURL = "https://www.archionweb.be/Public/List?fromOutside=False&page=";
+		incrementPartTwoURL = "&pageSize=500";
+		
+		pProcA.addPattern(1, Pattern.compile("Civilité :</span><span.+?>(.+?)<"));
+		pProcA.addPattern(2, Pattern.compile("Nom :</span><span.+?>(.+?)<"));
+		pProcA.addPattern(3, Pattern.compile("Prénom :</span><span.+?>(.+?)<"));
+		pProcA.addPattern(4, Pattern.compile("Inscrit au Conseil de :</span><span.+?>(.+?)<"));
+		pProcA.addPattern(5, Pattern.compile("Rue, n°, boîte :</span><span.+?>(.+?)<"));
+		pProcA.addPattern(6, Pattern.compile("Code Postal & Ville :</span><span.+?>(.+?)<"));
+		pProcA.addPattern(7, Pattern.compile("Téléphone :</span><span.+?>(.+?)<"));
+		pProcA.addPattern(8, Pattern.compile("E-Mail :</span><span.+?><a.+?>(.+?)<"));
+		pProcA.addPattern(9, Pattern.compile("Site Web :</span><span.+?><a.+?>(.+?)<"));
+		
+		pProcC.addPattern(1, Pattern.compile("Forme :</span><span.+?>(.+?)<"));
+		pProcC.addPattern(2, Pattern.compile("Nom de la société :</span><span.+?>(.+?)<"));
+		pProcC.addPattern(3, Pattern.compile("Inscrit au tableau de :</span><span.+?>(.+?)<"));
+		pProcC.addPattern(4, Pattern.compile("Rue, n°, boîte :</span><span.+?>(.+?)<"));
+		pProcC.addPattern(5, Pattern.compile("Code Postal & Ville :</span><span.+?>(.+?)<"));
+		pProcC.addPattern(6, Pattern.compile("Téléphone :</span><span.+?>(.+?)<"));
+		pProcC.addPattern(7, Pattern.compile("E-Mail :</span><span.+?><a.+?>(.+?)<"));
+		pProcC.addPattern(8, Pattern.compile("Site Web :</span><span.+?><a.+?>(.+?)<"));
+		
+		associesWrapPattern = Pattern.compile("<span class=\"title\">Associés(.+?)</div>", Pattern.DOTALL);
+		associesPattern = Pattern.compile("<li><a.+?>(.+?)<");
+				
+		typeOneProcessing();
+	}
+	
+	public void write(String data, String url) {
+		
+		//System.out.println(data);
+		String comArc = findInString(url, compArichPattern);
+		
+		if(comArc.equals("Company")) {
+			
+			String associesWraper = findInString(data, associesWrapPattern);
+			
+			associes = findAllInString(associesWraper, associesPattern);
+			
+			String ass = Utils.joinStringFromArray(associes, ";");
+					
+			pProcC.addData(9, ass);
+			
+			pProcC.processPatterns(data, writterComp);
+		}
+		else {
+			pProcA.processPatterns(data, writterArch);
+		}
+	}
+	
+	protected void typeOneProcessing() {
+		paginationURL = null;
+		detailsPageURL = null;
+		String pageHtml = null;
+		String detailsPageHtml = null;
+		String carURLHash = null;
+		long carID;
+		int errorDelay = initialErrorDelay;
+
+		Matcher paginationMatcher;
+		Matcher urlMatcher;
+		HashSet<String> carURLs;
+
+		mainLoop: for (int i = firstPageNumber; i <= lastPageNumber; i += pageIncrement) {
+			paginationURL = incrementPartOneURL + formParam + formValue + pageNumberParam + i + incrementPartTwoURL;
+			pageHtml = getHtml(paginationURL);
+			
+			//System.out.println(pageHtml);
+
+			if (pageHtml != null) {
+				System.out.println("-Pagination page: " + paginationURL);
+				errorCount = 0;
+				errorDelay = initialErrorDelay;
+				urlMatcher = detailsPagePattern.matcher(pageHtml);
+				carURLs = new HashSet<String>();
+				while (urlMatcher.find()) {
+					detailsPageURL = urlMatcher.group(1);
+					if (!detailsPageURL.startsWith("http:")) {
+						detailsPageURL = baseURL + detailsPageURL;
+						//System.out.println(detailsPageURL);
+					}
+
+					detailsPageURL = fixURL(detailsPageURL);
+					System.out.println("\t"+ detailsPageURL);
+					carURLHash = Sha1Hash.SHA1(detailsPageURL);
+
+					if (carURLs.contains(carURLHash)) {
+						continue;
+					} else {
+						carURLs.add(carURLHash);
+					}
+					
+					// test for duplicate url
+//					if (1 == 1 + 0) {
+//					//	DBWorksOnline.updateTime(carID, countryDescription.getCode());
+//						recordCount++;
+//						updatedRecordsCount++;
+//						continue;
+//					}
+
+					detailsPageHtml = getHtml(detailsPageURL);
+					//System.out.println("Ovde");
+					//da se obrise
+					//System.out.println(detailsPageHtml);
+
+					if (detailsPageHtml != null) {
+						//System.out.println("Usao");
+						write(detailsPageHtml, detailsPageURL);
+						recordCount++;
+						newRecordsCount++;
+					}
+					
+					sleep(requestDelay);
+				}
+				paginationMatcher = paginationPattern.matcher(pageHtml);
+				if (!paginationMatcher.find()) {
+					if (paginationCheckTime != 0) {
+					//	System.out.println("Last pagination check for " + webSiteID + " in progress ...");
+						sleep(paginationCheckTime);
+
+						pageHtml = getHtml(paginationURL);
+						if (pageHtml == null) {
+							break;
+						}
+
+						paginationMatcher = paginationPattern.matcher(pageHtml);
+						if (!paginationMatcher.find()) {
+							break;
+						} else {
+							i -= pageIncrement;
+						}
+					} else {
+						break;
+					}
+				}
+			} else {
+				errorCount++;
+				if (errorCount == 5) {
+					break;
+				}
+				i -= pageIncrement;
+				
+				sleep(errorDelay);
+				errorDelay *= 5;				
+			}
+			if (stopped) {
+				break;
+			}
+		}
+	}
+	
+	public static void main(String[] args) {
+		new Archionweb();
+	}
+
+}

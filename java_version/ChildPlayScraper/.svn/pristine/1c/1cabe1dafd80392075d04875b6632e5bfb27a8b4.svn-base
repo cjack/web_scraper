@@ -1,0 +1,241 @@
+package automated;
+
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.io.InputStreamReader;
+import java.util.ArrayList;
+import java.util.Properties;
+import java.util.regex.Pattern;
+import java.util.zip.GZIPInputStream;
+
+import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.methods.GetMethod;
+
+import util.*;
+
+public class AutomatedBot extends Thread {
+	
+	protected HttpClient httpClient;
+	
+	protected Properties props;
+	protected Writter writter;
+	protected PatternProcessor pProc;
+	
+	protected int firstPageNumber;
+	protected int pageIncrement;
+	protected int lastPageNumber;
+	
+	protected String baseURL;
+	protected String paginationUrlPrefix;
+	protected String paginationUrlSufix;
+	protected String paginationURL;
+	
+	protected int fetchPause;
+	
+	protected boolean noDetailsPage;
+	protected boolean noPagination;
+	
+	protected Pattern detailsPagePattern;
+	protected Pattern detailsWrapPattern;
+	
+	protected Pattern paginationPattern;
+
+	public AutomatedBot(String propertyFile) {	
+		try {
+			props = new Properties();
+			if (propertyFile != null) {
+				props.load(new FileReader(propertyFile));
+			} else {
+				props.load(new FileReader("properties/automated.properties"));
+			}			
+		} catch (Exception e) {
+			e.printStackTrace();
+			return;
+		}	
+		
+		writter = new Writter(props.getProperty("outputFile", "output.csv"));
+		pProc = new PatternProcessor();
+		
+		firstPageNumber = getNumericProperty("firstPage", 1);
+		pageIncrement = getNumericProperty("pageIncrement", 1);
+		lastPageNumber = getNumericProperty("lastPage", Integer.MAX_VALUE);
+		
+		baseURL = props.getProperty("baseUrl", "");
+		paginationUrlPrefix = props.getProperty("paginationUrlPrefix", "");
+		paginationUrlSufix = props.getProperty("paginationUrlSufix", "");
+		
+		detailsPagePattern = loadPattern("detailsPagePattern");
+		detailsWrapPattern = loadPattern("detailsWrapPattern");
+		paginationPattern = loadPattern("lastPageCheckPattern");
+		
+		fetchPause = getNumericProperty("fetchPause", 0);
+		
+		noDetailsPage = Boolean.parseBoolean(props.getProperty("noDetailsPage", "false"));
+		
+		loadPatterns();
+	}	
+	
+	
+
+	private int getNumericProperty(String property, int defaultValue) {
+		try {
+			int value = Integer.parseInt(props.getProperty(property, "1"));
+			return value;
+		} catch (Exception e) {}
+		
+		return defaultValue;
+	}
+
+
+
+	private Pattern loadPattern(String property) {
+		String value = props.getProperty(property, null);
+		if (value == null) return null;
+		
+		String parts [] = value.split("~");
+		if (parts.length == 2) {
+			return Pattern.compile(parts[0], Pattern.DOTALL);
+		} else {
+			return Pattern.compile(value);
+		}		
+		
+	}
+
+	private void loadPatterns() {
+		for (int pos = 1; pos < Integer.MAX_VALUE; pos++) {
+			String value = props.getProperty("dataPattern" + pos);
+			
+			if (value != null) {
+				String parts [] = value.split("~");
+				if (parts.length == 2) {
+					pProc.addPattern(pos, Pattern.compile(parts[0], Pattern.DOTALL));
+				} else {
+					pProc.addPattern(pos, Pattern.compile(value));
+				}
+				
+			} else {
+				break;
+			}
+			
+			String replacement = props.getProperty("dataReplace" + pos);
+			
+			if (replacement != null && !replacement.trim().equals("")) {
+				String parts [] = replacement.split("~");
+				pProc.addReplacement(pos, parts[0], parts[1]);
+			}
+		}
+		
+	}
+	
+	@Override
+	public void run() {
+		for (int i = firstPageNumber; i <= lastPageNumber; i += pageIncrement) {
+			paginationURL = paginationUrlPrefix + i + paginationUrlSufix;
+			String pageHtml = fetchPageContent(paginationURL);
+			
+			System.out.println(paginationURL);
+			
+			if (pageHtml != null) {
+				if (noDetailsPage) {
+					ArrayList<String> wraps = Patterns.findAllInString(pageHtml, detailsWrapPattern);
+					
+					for (String wrap : wraps) {
+						write(wrap);
+					}									
+				} else { // If there are detail pages
+					ArrayList<String> detailPagesLinks = Patterns.findAllInString(pageHtml, detailsPagePattern);
+					
+					for (String detailsPageURL : detailPagesLinks) {
+						
+						if (!detailsPageURL.startsWith("http:")) {
+							detailsPageURL = baseURL + detailsPageURL;
+						}
+
+						detailsPageURL = fixURL(detailsPageURL);
+						System.out.println("\t"+ detailsPageURL);
+						
+						String detPageHtml = fetchPageContent(detailsPageURL);
+						if (detPageHtml != null) {
+							write(detPageHtml);
+						}
+						
+						sleepAbit(fetchPause);
+					}
+				}
+			}	
+			
+			String paginationCheck = Patterns.findInString(pageHtml, paginationPattern);
+			if (paginationCheck.trim().equals("")) {
+				break;
+			}
+			
+			sleepAbit(fetchPause);
+						
+		}
+	}
+	
+	public void write (String data) {
+		pProc.processPatterns(data, writter);
+	}
+	
+	public void sleepAbit (long milliseconds) {
+		
+		if (milliseconds == 0) return;
+		
+		try {
+			Thread.sleep(milliseconds);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+	
+	public static void main(String[] args) {		
+		new AutomatedBot(args.length > 0 ? args[0] : null).start();
+	}
+	
+	public String fetchPageContent(String fromPage) {
+		try {
+			if (httpClient == null) {
+				httpClient = new HttpClient();
+			}
+			
+			GetMethod get = new GetMethod(fromPage);
+			get.setRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/43.0.2357.130 Safari/537.36");
+			httpClient.executeMethod(get);
+			
+			StringBuilder sb = new StringBuilder();
+			String line;
+			BufferedReader in;
+			
+			if (get.getResponseHeader("Content-Encoding") != null && get.getResponseHeader("Content-Encoding").getValue().equals("gzip")) {
+				in = new BufferedReader(new InputStreamReader(new GZIPInputStream(get.getResponseBodyAsStream())));
+			} else {
+				in = new BufferedReader(new InputStreamReader(get.getResponseBodyAsStream(), "utf-8"));
+			}
+			
+			while ((line = in.readLine()) != null) {
+				sb.append(line).append("\n");
+			}
+			
+			in.close();
+			get.releaseConnection();
+			
+			return sb.toString();			
+		} catch (Exception e) {
+			System.err.println("#### GREŠKA ZA: " + fromPage + " ####");
+			e.printStackTrace();			
+			return null;
+		}
+	}
+	
+	protected String fixURL(String url) {
+		if (url != null) {
+			return url.replaceAll(" ", "%20").replaceAll("&amp;", "&").replaceAll("\\\\", "\\\\\\\\").replaceAll("'", "\\\\'");
+		} else {
+			return "";
+		}
+	}
+	
+}
+
+

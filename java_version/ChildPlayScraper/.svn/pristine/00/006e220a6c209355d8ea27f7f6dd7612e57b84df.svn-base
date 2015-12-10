@@ -1,0 +1,41 @@
+package empty;
+
+import master.Master;
+import util.*;
+import java.util.regex.Pattern;
+import java.util.*;
+
+public class DummyScraper extends Master {
+
+	public DummyScraper(Integer firstPage, Integer lastPage) {		
+		this();
+		firstPageNumber = firstPage;
+		lastPageNumber = lastPage;
+	}
+	
+	public DummyScraper() {		
+		
+	}	
+
+	public static void main(String[] args) {
+		if (args.length == 2) {
+			new DummyScraper(Integer.parseInt(args[0]), Integer.parseInt(args[1])).start();
+		} else {
+			new DummyScraper().start();
+		}
+		
+	}
+
+	@Override
+	public void run() {
+		
+	}
+	
+	@Override
+	public void write (String data) {
+		
+	}
+	
+}
+
+

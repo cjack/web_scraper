@@ -1,0 +1,197 @@
+package bots;
+
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import util.PatternProcessor;
+import util.Sha1Hash;
+import util.Writter;
+
+import master.Master;
+
+public class Betakonline extends Master {
+	
+	private Pattern wraperPattern;
+	private Pattern detailsPattern;
+	private ArrayList<String> lista;
+	private String PageHtml;
+	private Pattern patern;
+	private ArrayList<Integer> listaBrojevaZaUrl;
+
+	public Betakonline() {
+		
+		baseURL = "http://www.betakonline.com/advertisements/apartments/view/";
+
+		paginationPattern = Pattern.compile("class=\"next\">التالى &gt;&gt;");
+		detailsPagePattern= Pattern.compile("<b><a href=\"/advertisements/apartments/view/(.+?)\"");
+		
+		pProc = new PatternProcessor();
+		writter = new Writter("output.csv");
+		writter.writeLine("المدينة, المنطقة, النوع, الغرض, العنوان, الوصف, التليفون, المحمول التليفون, السعر");
+		
+		wraperPattern = Pattern.compile("<dl style.+?>(.+?)</dl>", Pattern.DOTALL);
+		
+		pProc.addPattern(1, Pattern.compile("المدينة.+?\\s*<dd.*?>\\s*(.+?)\\s+&nbsp", Pattern.DOTALL));
+		pProc.addPattern(2, Pattern.compile("المنطقة.+?\\s*<dd.*?>\\s*(.+?)\\s+&nbsp", Pattern.DOTALL));
+		pProc.addPattern(3, Pattern.compile("النوع.+?\\s*<dd.*?>\\s*(.+?)\\s+&nbsp", Pattern.DOTALL));
+		pProc.addPattern(4, Pattern.compile("الغرض.+?\\s*<dd.*?>\\s*(.+?)\\s+&nbsp", Pattern.DOTALL));
+		pProc.addPattern(5, Pattern.compile("العنوان.+?\\s*<dd.*?>\\s*(.+?)\\s+&nbsp", Pattern.DOTALL));
+		pProc.addPattern(6, Pattern.compile("الوصف.+?\\s*<dd.*?>\\s*(.+?)\\s+&nbsp", Pattern.DOTALL));
+		pProc.addPattern(7, Pattern.compile("التليفون.+?\\s*<dd.*?>\\s*(.+?)\\s+&nbsp", Pattern.DOTALL));
+		pProc.addPattern(8, Pattern.compile("التليفون المحمول.+?\\s*<dd.*?>\\s*(.+?)\\s+&nbsp", Pattern.DOTALL));
+		pProc.addPattern(9, Pattern.compile("السعر.+?\\s*<dd.*?>\\s*(.+?)\\s+&nbsp", Pattern.DOTALL));
+		
+		for (int i = 1; i <= 9; i++) {
+			pProc.addReplacement(i, "<br />", "");
+			pProc.addReplacement(i, "\n", "");
+		}
+
+		
+		listaBrojevaZaUrl = new ArrayList<Integer>();
+		listaBrojevaZaUrl.add(4);
+		listaBrojevaZaUrl.add(5);
+		listaBrojevaZaUrl.add(6);
+		listaBrojevaZaUrl.add(7);
+		listaBrojevaZaUrl.add(8);
+		listaBrojevaZaUrl.add(9);
+		listaBrojevaZaUrl.add(10);
+		listaBrojevaZaUrl.add(12);
+	
+		for(int i = 15; i < 30; i++) {
+			listaBrojevaZaUrl.add(i);
+		}
+	
+	}
+	
+	public void write (String data) {
+		
+		String wrap = findInString(data, wraperPattern);
+		pProc.processPatterns(wrap, writter);
+		
+	}
+	
+	public static void main(String[] args) {
+		
+		new Betakonline().run();
+	}
+	
+	public void run() {
+		
+		for(int broj  : listaBrojevaZaUrl)  {
+			
+			firstPageNumber = 1;
+			pageIncrement = 1;
+			
+			incrementPartOneURL = "http://www.betakonline.com/advertisements/search/page:"; 
+			incrementPartTwoURL = "/city_id:" + broj;
+			
+			typeOneProcessing();		
+			
+		}
+		
+	}
+	
+	protected void typeOneProcessing() {
+		paginationURL = null;
+		detailsPageURL = null;
+		String pageHtml = null;
+		String detailsPageHtml = null;
+		String carURLHash = null;
+		long carID;
+		int errorDelay = initialErrorDelay;
+
+		Matcher paginationMatcher;
+		Matcher urlMatcher;
+		HashSet<String> carURLs;
+
+		mainLoop: for (int i = firstPageNumber; i <= lastPageNumber; i += pageIncrement) {
+			paginationURL = incrementPartOneURL + formParam + formValue + pageNumberParam + i + incrementPartTwoURL;
+			pageHtml = getHtml(paginationURL);
+			
+			//System.out.println(pageHtml);
+
+			if (pageHtml != null) {
+				System.out.println("-Pagination page: " + paginationURL);
+				errorCount = 0;
+				errorDelay = initialErrorDelay;
+				urlMatcher = detailsPagePattern.matcher(pageHtml);
+				carURLs = new HashSet<String>();
+				while (urlMatcher.find()) {
+					detailsPageURL = urlMatcher.group(1);
+					if (!detailsPageURL.startsWith("http:")) {
+						detailsPageURL = baseURL + detailsPageURL;
+					}
+
+					detailsPageURL = fixURL(detailsPageURL);
+					System.out.println("\t"+ detailsPageURL);
+					
+					PageHtml = getHtml(detailsPageURL);
+				//	System.out.println(PageHtml);
+					
+					carURLHash = Sha1Hash.SHA1(detailsPageURL);
+
+					if (carURLs.contains(carURLHash)) {
+						continue;
+					} else {
+						carURLs.add(carURLHash);
+					}
+					
+					// test for duplicate url
+//					if (1 == 1 + 0) {
+//					//	DBWorksOnline.updateTime(carID, countryDescription.getCode());
+//						recordCount++;
+//						updatedRecordsCount++;
+//						continue;
+//					}
+
+					detailsPageHtml = getHtml(detailsPageURL);
+
+					if (detailsPageHtml != null) {
+						write(detailsPageHtml);
+						recordCount++;
+						newRecordsCount++;
+					}
+					
+					sleep(requestDelay);
+				}
+				paginationMatcher = paginationPattern.matcher(pageHtml);
+				if (!paginationMatcher.find()) {
+					if (paginationCheckTime != 0) {
+					//	System.out.println("Last pagination check for " + webSiteID + " in progress ...");
+						sleep(paginationCheckTime);
+
+						pageHtml = getHtml(paginationURL);
+						System.out.println(pageHtml);
+						if (pageHtml == null) {
+							break;
+						}
+
+						paginationMatcher = paginationPattern.matcher(pageHtml);
+						if (!paginationMatcher.find()) {
+							break;
+						} else {
+							i -= pageIncrement;
+						}
+					} else {
+						break;
+					}
+				}
+			} else {
+				errorCount++;
+				if (errorCount == 5) {
+					break;
+				}
+				i -= pageIncrement;
+				
+				sleep(errorDelay);
+				errorDelay *= 5;				
+			}
+			if (stopped) {
+				break;
+			}
+		}
+	}
+
+}

@@ -1,0 +1,145 @@
+package util;
+
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.regex.Pattern;
+
+import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.methods.GetMethod;
+
+
+public class EmailFinder {
+
+	private HttpClient client;
+	
+	public EmailFinder () {
+		client = new HttpClient();
+	}
+	
+	public String findEmail(String website) {
+		if (website.contains("facebook")) {
+			return "";
+		}
+		
+		String eMail = "";
+		
+		try {
+			String pageHtml = fetchPageContent(website);
+			if (pageHtml == null) {
+				return "";
+			}
+			
+			eMail = findEmailOnPage(pageHtml);
+			if (eMail != null) {
+				System.err.println("\t\tFound email: " + eMail);
+				return eMail;
+			}
+			
+			LinkedList<String> deepLinks = fetchLinksOnPage(website, pageHtml);
+			for (String deepLink : deepLinks) {
+				System.err.print("\t\tChecking page: " + deepLink + "... ");
+				pageHtml = fetchPageContent(deepLink);
+				if (pageHtml == null) {
+					continue;
+				}
+				
+				eMail = findEmailOnPage(pageHtml);
+				if (eMail != null) {
+					System.out.println("email found - " + eMail);
+					return eMail;
+				}
+				
+				System.out.println("email not found!");
+			}
+		} catch (Exception e) {
+			return "";
+		}
+		
+		return eMail;
+				
+	}
+	
+	private Pattern emailPattern = Pattern.compile("([\\w-\\.]+@[\\w\\.\\-]+\\.[a-zA-Z]{2,4})");
+	
+	private String findEmailOnPage(String pageHtml) {
+		String email = Patterns.findInString(pageHtml, emailPattern);
+		
+		if (!email.equals("")) {
+			return email;
+		} else {
+			return null;
+		}
+		
+	}
+
+	public String fetchPageContent(String fromPage) {
+		try {
+			if (client == null) {
+				client = new HttpClient();
+				client.getHttpConnectionManager().getParams().setConnectionTimeout(10000); 
+				client.getHttpConnectionManager().getParams().setSoTimeout(10000);
+			}
+			
+			GetMethod get = new GetMethod(fromPage);
+			client.executeMethod(get);
+			
+			StringBuilder sb = new StringBuilder();
+			String line;
+			BufferedReader in = new BufferedReader(new InputStreamReader(get.getResponseBodyAsStream()));
+			while ((line = in.readLine()) != null) {
+				sb.append(line).append("\n");
+			}
+			
+			in.close();
+			get.releaseConnection();
+			
+			return sb.toString();			
+		} catch (Exception e) {
+			System.err.println("#### GREŠKA ZA: " + fromPage + " ####");
+			e.printStackTrace();			
+			return null;
+		}
+	}
+	
+	private Pattern hrefPattern = Pattern.compile("href=[\"'](.+?)[\"']");
+	
+	private LinkedList<String> fetchLinksOnPage(String siteBase, String pageHtml) {
+		HashSet<String> links = new HashSet<String>();
+		
+		ArrayList<String> hrefs = Patterns.findAllInString(pageHtml, hrefPattern);
+		
+		for (String href : hrefs) {
+			if (href.startsWith("http")) continue;
+			if (href.matches(".+\\.(?:css|js|zip)")) continue;
+			
+			if (!href.startsWith("http:")) {
+				if (!siteBase.endsWith("/")) {
+					siteBase = siteBase + "/";
+				}
+				
+				if (href.startsWith("/")) {
+					href = href.substring(1);
+				}
+				
+				href = siteBase + href;
+				
+			}
+			links.add(href);
+		}
+		
+		LinkedList<String> toReturn = new LinkedList<String>();
+		for (String link : links) {
+			if (link.contains("contact") || link.contains("kontakt")) {
+				toReturn.addFirst(link);
+			} else {
+				toReturn.addLast(link);
+			}
+		}
+		
+		return toReturn;
+	}
+	
+}

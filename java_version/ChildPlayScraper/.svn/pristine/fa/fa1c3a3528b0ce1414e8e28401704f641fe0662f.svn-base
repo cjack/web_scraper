@@ -1,0 +1,66 @@
+package util;
+
+import java.util.Properties;
+
+import javax.mail.Session;
+import javax.mail.Transport;
+import javax.mail.Message.RecipientType;
+import javax.mail.internet.InternetAddress;
+import javax.mail.internet.MimeMessage;
+
+public class MailSender {
+	
+	private static MailSender instance;
+	
+	private Session session;
+	
+	public static synchronized MailSender getInstance (Properties params) {
+		if (instance == null) {
+			initMailSender(params);
+		} 		
+		return instance;	
+	}
+
+	private static void initMailSender(Properties params) {
+		instance = new MailSender(params);
+	}
+	
+	private MailSender(Properties params) {
+		try {
+			Properties props = System.getProperties(); 
+			props.put("mail.smtp.starttls.enable", "true"); 
+			props.put("mail.smtp.host", "smtp.gmail.com"); 
+			props.setProperty("mail.transport.protocol", "smtps");
+			props.put("mail.smtp.user", params.getProperty("email")); 
+			props.put("mail.smtp.password", params.getProperty("emailpass")); 
+			props.put("mail.smtp.port", "465"); 
+			props.put("mail.smtps.auth", "true"); 
+			session = Session.getDefaultInstance(props, null); 			
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+	
+	public void sendMail(String title, String message, Properties params) {
+		try {
+			MimeMessage mail = new MimeMessage(session); 
+			mail.setFrom(new InternetAddress(params.getProperty("email")));
+			
+			String emails [] = params.getProperty("emailTo").split(",");
+			for (String email : emails) {
+				mail.addRecipient(RecipientType.TO, new InternetAddress(email));
+			}			
+			
+			mail.setSubject(title);
+			mail.setText(message); 
+
+			Transport transport = session.getTransport("smtps"); 
+			transport.connect("smtp.gmail.com", params.getProperty("email"), params.getProperty("emailpass")); 
+			transport.sendMessage(mail, mail.getAllRecipients()); 
+			transport.close(); 
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+	}
+}

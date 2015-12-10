@@ -1,0 +1,414 @@
+package bots;
+
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.FileReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import util.Files;
+
+import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.methods.GetMethod;
+
+import proxy.ProxyFetcher;
+
+import util.PatternProcessor;
+import util.Sha1Hash;
+import util.Writter;
+import master.Master;
+
+public class YellowPagesAU extends Master {
+
+	private Pattern paternSuburb;
+	private Pattern paternSuburbWraper;
+	private ArrayList<String> suburbs;
+	private Pattern businessNamePattern;
+	private Pattern FullAddressPattern;
+	private Pattern ShortAddresPattern;
+	private Pattern PostcodePattern;
+	private Pattern PhonePattern;
+	private Pattern EmailPattern;
+	private Pattern WebsitePattern;
+	private Pattern detailPattern;
+	private Pattern cityStatePattern;
+	private Pattern ImagePattern;
+	private String[] cityState;
+	private String email;
+	private String businessName;
+	private String currentState;
+	
+	private ProxyFetcher pFetcher;
+	
+	private String category;
+
+
+	public YellowPagesAU (String category) {
+		this.category = category;
+		
+	//	writter = new Writter("yellowpages"+category.toLowerCase().replaceAll("\\s+", "-")+".csv");
+		writter = new Writter("yellowpages_au.csv");
+		writter.writeLine("Business name, City, State, Full address, Postcode, Phone, Email, Website, Image name");
+		
+		pProc = new PatternProcessor();
+		pFetcher = new ProxyFetcher();
+		
+		paginationPattern = Pattern.compile("Next &#187;");
+		//detailsPagePattern = Pattern.compile("<div class='body left right'>\\s+<a class='listing-name' href='(.+?)'", Pattern.DOTALL);
+		
+		detailPattern = Pattern.compile("cell in-area-cell middle-cell(.+?)>Send to mobile</span>", Pattern.DOTALL);
+		
+		businessNamePattern = Pattern.compile("<meta itemprop=\"name\" content=\"(.+?)\"/>");
+		cityStatePattern = Pattern.compile("data-index-link.+? - (.+?),");
+		FullAddressPattern = Pattern.compile("<p class='listing-address mappable-address.+?>(.+?)</p>");
+		ShortAddresPattern = Pattern.compile("(.+?),");
+		PostcodePattern = Pattern.compile("<p class='listing-address mappable-address.+?>.+?(\\d{3,})</p>");
+		PhonePattern = Pattern.compile("<a href=\"tel.+?<span class=\"contact-text\">(.+?)<", Pattern.DOTALL);
+		EmailPattern = Pattern.compile("data-email=\"(.+?)\"");
+		WebsitePattern = Pattern.compile("<div class=\"call-to-action\\s*\">\\s+<a href=\"(http.+?)\".+?contact-url", Pattern.DOTALL);
+		ImagePattern = Pattern.compile("class=\"image logo\"><img src=[\"']//(.+?/content/.+?)[\"']",Pattern.DOTALL);	
+		
+	}
+	
+	public void run() {
+		
+		String nizState[] = {"NSW", "VIC", "QLD", "WA", "SA", "TAS", "ACT", "NT"};
+		
+		paternSuburbWraper = Pattern.compile("<div class='cell filter suburb-filter last-cell'(.+?)<div class='cell filter-cell category middle-cell'", Pattern.DOTALL);
+		paternSuburb = Pattern.compile("class=\"filter-items\"\\s*title=.+?>(.+?)<", Pattern.DOTALL);
+		
+		//za prvih 5 
+		for(int i = 3; i < 5 ; i++) {
+			
+			currentState = nizState[i];
+						
+			String strana = fetchPageContent("http://www.yellowpages.com.au/search/listings?clue="+category+"&eventType=pagination&pageNumber=1&referredBy=UNKNOWN&state=" + nizState[i]);
+					
+			String tekst = findInString(strana, paternSuburbWraper);
+										
+			suburbs = findAllInString(tekst, paternSuburb);
+			
+			//System.out.println(suburbs);
+			
+			//incrementPartTwoURL= "&referredBy=UNKNOWN&state=NSW&suburb=Sydney+NSW";
+			
+			for(String sub : suburbs) {
+				
+				firstPageNumber = 1;
+				pageIncrement = 1;
+			
+				incrementPartOneURL = "http://www.yellowpages.com.au/search/listings?clue="+category+"&eventType=pagination&pageNumber=";
+				incrementPartTwoURL= "&referredBy=UNKNOWN&state=" + nizState[i] + "&suburb=" + sub.replace(" ", "+") + "+" + nizState[i];
+				
+				typeOneProcessing();
+			
+			}
+		}		
+		
+		for(int i = 5; i < 8; i++) {
+			
+			currentState = nizState[i];
+			
+			firstPageNumber = 1;
+			pageIncrement = 1;
+		
+			incrementPartOneURL = "http://www.yellowpages.com.au/search/listings?clue="+category+"&eventType=pagination&pageNumber=";
+			incrementPartTwoURL= "&referredBy=UNKNOWN&state=" + nizState[i];
+			
+			typeOneProcessing();
+		}
+		
+	}
+	
+//	public void run() {
+		
+	//	String nizState[] = {"NSW", "VIC", "QLD", "WA", "SA", "TAS", "ACT", "NT"};
+		
+	//	currentState = "VIC";
+		
+	//	paternSuburbWraper = Pattern.compile("<div class='cell filter suburb-filter last-cell'(.+?)<div class='cell filter-cell category middle-cell'", Pattern.DOTALL);
+	//	paternSuburb = Pattern.compile("class=\"filter-items\"\\s*title=.+?>(.+?)<", Pattern.DOTALL);
+		
+	//	String strana = fetchPageContent("https://www.yellowpages.com.au/search/listings?clue=cabinet+makers&locationClue=Greater+Melbourne%2C++VIC&pageNumber=5&referredBy=UNKNOWN&&eventType=pagination");
+					
+	//	String tekst = findInString(strana, paternSuburbWraper);
+										
+	//	suburbs = findAllInString(tekst, paternSuburb);			
+
+	//	for(String sub : suburbs) {
+			
+	//		firstPageNumber = 1;
+	//		pageIncrement = 1;
+		
+	//		incrementPartOneURL = "https://www.yellowpages.com.au/search/listings?clue=Timber++Joiner&locationClue=Melbourne&pageNumber=";
+	//		incrementPartTwoURL= "&referredBy=UNKNOWN&&eventType=pagination";
+			
+	//		typeOneProcessing();
+		
+	//	}		
+//	}
+	
+//	public void run() {
+//		
+//	//	String nizState[] = {"NSW", "VIC", "QLD", "WA", "SA", "TAS", "ACT", "NT"};
+//		
+//		currentState = "VIC";
+//		
+//	//	paternSuburbWraper = Pattern.compile("<div class='cell filter suburb-filter last-cell'(.+?)<div class='cell filter-cell category middle-cell'", Pattern.DOTALL);
+//	//	paternSuburb = Pattern.compile("class=\"filter-items\"\\s*title=.+?>(.+?)<", Pattern.DOTALL);
+//		
+//	//	String strana = fetchPageContent("https://www.yellowpages.com.au/search/listings?clue=home+maintenance+%26+repairs&locationClue=Greater+Melbourne%2C+VIC&lat=&lon=&selectedViewMode=list");
+//					
+//	//	String tekst = findInString(strana, paternSuburbWraper);
+//										
+//	//	suburbs = findAllInString(tekst, paternSuburb);			
+//
+//	//	for(String sub : suburbs) {
+//			
+//			firstPageNumber = 1;
+//			pageIncrement = 1;
+//		
+//			incrementPartOneURL = "https://www.yellowpages.com.au/search/listings?clue=Pharmacies&locationClue=Bendigo+Region%2C+VIC&lat=&lon=&selectedViewMode=list&pageNumber=";
+//	//		incrementPartTwoURL= "&referredBy=UNKNOWN&&eventType=refinement&sortBy=relevance&suburb=" + sub.replace(" ", "+") + "+VIC";
+//			
+//			typeOneProcessing();
+//		
+//	//	}		
+//	}
+	
+	private int count = 1;
+	
+	public void write(String data) {
+		
+		ArrayList<String> details = findAllInString(data, detailPattern);
+		
+		for(String detail : details) {
+					
+			businessName = findInString(detail, businessNamePattern);
+			
+			businessName = businessName.replaceAll("&#39;", "'");
+			businessName = businessName.replaceAll("&amp;", "&");
+			
+			pProc.addData(1, Integer.toString(count++));
+			pProc.addData(2, businessName);
+			
+			String city = "";
+			city = findInString(detail, cityStatePattern);
+			pProc.addData(4, city);
+			
+			pProc.addData(5, currentState);	
+						
+			String adresa = "";
+			adresa = findInString(detail, FullAddressPattern);			
+			pProc.addData(7, adresa);
+			
+			String shortAddress = "";
+			shortAddress = findInString(adresa, ShortAddresPattern);
+			pProc.addData(3, shortAddress);
+			
+			String postcode = "";
+			postcode = findInString(detail, PostcodePattern);
+			pProc.addData(6, postcode);
+			
+			String phone = "";
+			phone = findInString(detail, PhonePattern);
+			pProc.addData(8, phone);
+			
+			String email = "";
+			email = findInString(detail, EmailPattern);					
+			pProc.addData(9, email);
+			
+			String website = "";
+			website = findInString(detail, WebsitePattern);
+			pProc.addData(10, website);			
+					
+			String slika = "";
+			slika = findInString(detail, ImagePattern);	
+			
+		//	System.out.println(slika);
+			
+			if(!slika.equals("")) {				
+				
+				String linkSlike = "http://" + slika;
+				
+				int i = slika.lastIndexOf("/");
+				
+				slika = slika.substring(i+1, slika.length());		
+				
+				try {
+					saveImage(linkSlike, "imgs/" + slika);
+				} catch (IOException e) {
+				
+					e.printStackTrace();
+				}
+				
+			}
+			
+			pProc.addData(11, slika);	
+			
+			pProc.processPatterns(detail, writter);
+			
+		}
+		
+		
+				
+	}
+	
+	public String fetchPageContent(String fromPage) {
+		try {
+			if (httpClient == null) {
+				httpClient = new HttpClient();
+			}
+			
+			GetMethod get = new GetMethod(fromPage);
+			
+			get.setRequestHeader("Host", "www.yellowpages.com.au");
+			get.setRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:35.0) Gecko/20100101 Firefox/35.0");
+			
+			httpClient.executeMethod(get);
+			
+			StringBuilder sb = new StringBuilder();
+			String line;
+			BufferedReader in = new BufferedReader(new InputStreamReader(get.getResponseBodyAsStream()));
+			while ((line = in.readLine()) != null) {
+				sb.append(line).append("\n");
+			}
+			
+			in.close();
+			get.releaseConnection();
+			
+			return sb.toString();			
+		} catch (Exception e) {
+			System.err.println("#### GREŠKA ZA: " + fromPage + " ####");
+			e.printStackTrace();			
+			return null;
+		}
+	}
+	
+	protected void typeOneProcessing() {
+		paginationURL = null;
+		detailsPageURL = null;
+		String pageHtml = null;
+	//	String detailsPageHtml = null;
+	//	String carURLHash = null;
+		long carID;
+		int errorDelay = initialErrorDelay;
+
+		Matcher paginationMatcher;
+		Matcher urlMatcher;
+		HashSet<String> carURLs;
+
+		mainLoop: for (int i = firstPageNumber; i <= lastPageNumber; i += pageIncrement) {
+			paginationURL = incrementPartOneURL + formParam + formValue + pageNumberParam + i + incrementPartTwoURL;
+			pageHtml = pFetcher.getHtmlWithProxy(paginationURL, "Yellow Pages");//fetchPageContent(paginationURL);
+			
+		//	System.out.println(pageHtml);
+
+			if (pageHtml != null) {
+				System.out.println("-Pagination page: " + paginationURL);
+				errorCount = 0;
+				errorDelay = initialErrorDelay;
+				
+				write(pageHtml);
+				
+	//			sleep(8000);
+	/*			urlMatcher = detailsPagePattern.matcher(pageHtml);
+				carURLs = new HashSet<String>();
+				while (urlMatcher.find()) {
+					detailsPageURL = urlMatcher.group(1);
+					if (!detailsPageURL.startsWith("http:")) {
+						detailsPageURL = baseURL + detailsPageURL;
+					}
+
+					detailsPageURL = fixURL(detailsPageURL);
+					System.out.println("\t"+ detailsPageURL);
+					carURLHash = Sha1Hash.SHA1(detailsPageURL);
+
+					if (carURLs.contains(carURLHash)) {
+						continue;
+					} else {
+						carURLs.add(carURLHash);
+					}
+					
+					// test for duplicate url
+//					if (1 == 1 + 0) {
+//					//	DBWorksOnline.updateTime(carID, countryDescription.getCode());
+//						recordCount++;
+//						updatedRecordsCount++;
+//						continue;
+//					}
+
+					detailsPageHtml = getHtml(detailsPageURL);
+					//da se obrise
+					//System.out.println(detailsPageHtml);
+
+					if (detailsPageHtml != null) {
+						write(detailsPageHtml);
+						recordCount++;
+						newRecordsCount++;
+					}
+					
+					sleep(requestDelay);
+				}*/
+				
+				paginationMatcher = paginationPattern.matcher(pageHtml);
+				if (!paginationMatcher.find()) {
+					Writter lastPageWritter = new Writter("lastPage"+System.currentTimeMillis()+".html");
+					lastPageWritter.writeLine(pageHtml);
+					lastPageWritter.close();
+					break;					
+				}
+			} else {
+				errorCount++;
+				if (errorCount == 5) {
+					break;
+				}
+				i -= pageIncrement;
+				
+				sleep(errorDelay);
+				errorDelay *= 5;				
+			}
+			if (stopped) {
+				break;
+			}
+		}
+	}
+		
+	public static void saveImage(String imageUrl, String destinationFile) throws IOException {
+		URL url = new URL(imageUrl);
+		java.net.URLConnection c = url.openConnection();
+		c.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:35.0) Gecko/20100101 Firefox/35.0");
+		c.setRequestProperty("Host", "www.yellowpages.com.au");
+		
+		File f = new File(destinationFile);
+		if (f.exists()) return;
+		
+		InputStream is = c.getInputStream();
+		OutputStream os = new FileOutputStream(destinationFile);
+
+		byte[] b = new byte[2048];
+		int length;
+
+		while ((length = is.read(b)) != -1) {
+			os.write(b, 0, length);
+		}
+
+		is.close();
+		os.close();
+	}
+	
+	public static void main(String[] args) {
+		System.out.println(args[0]);
+	//	new YellowPagesAU(args[0]).run();
+		new YellowPagesAU("Mechanics").run();
+
+	}
+
+}

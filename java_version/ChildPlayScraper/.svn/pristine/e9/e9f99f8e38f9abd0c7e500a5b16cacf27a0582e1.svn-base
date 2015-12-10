@@ -1,0 +1,24 @@
+package bots;
+
+import java.util.ArrayList;
+
+import util.Files;
+
+public class TestPaginas {
+	
+	private static ArrayList<String> file;
+
+	public static void main(String[] args) {
+		
+		file = Files.loadListFromFile("inputCategoryPaginas.txt");
+		
+		for(String s : file) {
+			
+			s = s.toLowerCase();
+			s = s.replaceAll("\\s+", "-");
+			System.out.println(s);
+		}
+		
+	}
+
+}

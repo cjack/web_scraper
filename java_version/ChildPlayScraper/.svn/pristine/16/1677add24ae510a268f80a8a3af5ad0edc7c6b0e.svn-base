@@ -1,0 +1,350 @@
+package bots;
+
+import java.awt.Image;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.awt.image.BufferedImage;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.util.ArrayList;
+import java.util.Scanner;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import javax.imageio.ImageIO;
+import javax.swing.BorderFactory;
+import javax.swing.ImageIcon;
+import javax.swing.JButton;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JTextArea;
+import javax.swing.JTextField;
+import javax.swing.ScrollPaneConstants;
+
+import org.apache.commons.httpclient.Header;
+import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.URI;
+import org.apache.commons.httpclient.methods.GetMethod;
+import org.apache.commons.httpclient.methods.PostMethod;
+
+import master.Master;
+import util.*;
+
+public class CaseExtractor extends Master {
+	
+	private HttpClient client;
+	private JFrame frame;
+	private JPanel captchaPanel;
+	private JTextField captchaText;
+	private JTextField dateText;
+	private static JButton startScrapeBtn;
+	private JTextArea textArea;
+
+	public CaseExtractor() {		
+		try {
+			client = new HttpClient();
+			
+					    
+		    frame = new JFrame("Case Extractor");		    
+		    frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+		    frame.setLayout(null);
+		    frame.setSize(600, 600);
+		    frame.setLocationRelativeTo(null);
+		    
+		    JButton getCaptchaBtn = new JButton("Get Captcha");
+		    getCaptchaBtn.setSize(150, 30);
+		    getCaptchaBtn.setLocation(225, 20);
+		    getCaptchaBtn.addActionListener(new ActionListener() {
+				
+				@Override
+				public void actionPerformed(ActionEvent arg0) {
+					getCaptcha();
+					
+				}
+			});
+		    frame.add(getCaptchaBtn);
+		    
+		    captchaPanel = new JPanel();
+		    
+		    captchaPanel.setSize(200, 75);
+		    captchaPanel.setLocation(200, 70);
+		    captchaPanel.setBorder(BorderFactory.createBevelBorder(1));
+		    frame.add(captchaPanel);
+		    
+		    JLabel labelCaptcha = new JLabel("Enter captcha");
+		    labelCaptcha.setLocation(200, 170);
+		    labelCaptcha.setSize(100, 25);
+		    
+		    captchaText = new JTextField();
+		    captchaText.setLocation(300, 170);
+		    captchaText.setSize(100, 25);
+		    
+		    JLabel labelDate = new JLabel("Enter date");
+		    labelDate.setLocation(200, 180);
+		    labelDate.setSize(100, 25);
+		    
+		    dateText = new JTextField();
+		    dateText.setLocation(300, 180);
+		    dateText.setSize(100, 25);
+		    
+		    textArea = new JTextArea();
+			textArea.setSize(460, 400);
+			textArea.setLocation(20, 110);
+			
+			JScrollPane scroll = new JScrollPane(textArea);
+			scroll.setSize(550, 290);
+			scroll.setLocation(20, 260);
+			
+	        scroll.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS);
+		    
+		    frame.add(labelCaptcha);
+		 //   frame.add(labelDate);
+		    frame.add(captchaText);
+		//    frame.add(dateText);
+		    frame.add(startScrapeBtn);
+		    frame.add(scroll);
+		    
+		    frame.setVisible(true);
+		    
+//		    String response;
+//		    Scanner scan = new Scanner(System.in);
+//		    response = scan.next();
+//		    System.out.println(response);
+//		    
+//		    PostMethod post = new PostMethod("http://epwsgdp1.courts.state.va.us/gdcourts/captchaVerification.do");
+//		    post.setFollowRedirects(false);
+//		    
+//		    post.setRequestHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+//		    post.setRequestHeader("Host", "epwsgdp1.courts.state.va.us");
+//		    post.setRequestHeader("Referer", "http://epwsgdp1.courts.state.va.us/gdcourts/captchaVerification.do?landing=landing");
+//		    
+//		    post.setParameter("accept", "Accept");
+//		    post.setParameter("j_captcha_response", response);
+//		    post.setParameter("pageName", "landingCaptchaVerificationPage");
+//		    post.setParameter("showCaptcha", "true");
+//		    
+//		    client.executeMethod(post);
+//		    
+//		    for (Header h : get.getResponseHeaders()) {
+//				System.out.println(h.getName() + " - " + h.getValue());					
+//			}
+//		    
+//		    get = new GetMethod("http://epwsgdp1.courts.state.va.us/gdcourts/caseSearch.do?fromSidebar=true&searchLanding=searchLanding&searchType=hearingDate&searchDivision=V&searchFipsCode=059");
+//		    get.setRequestHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+//			get.setRequestHeader("Host", "epwsgdp1.courts.state.va.us");
+//			get.setRequestHeader("Referer", "http://epwsgdp1.courts.state.va.us/gdcourts/captchaVerification.do?landing=landing");
+//			
+//			client.executeMethod(get);
+//			
+//			post = new PostMethod("http://epwsgdp1.courts.state.va.us/gdcourts/caseSearch.do");
+//			post.setRequestHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+//		    post.setRequestHeader("Host", "epwsgdp1.courts.state.va.us");
+//		    post.setRequestHeader("Referer", "http://epwsgdp1.courts.state.va.us/gdcourts/caseSearch.do?fromSidebar=true&searchLanding=searchLanding&searchType=hearingDate&searchDivision=V&searchFipsCode=059");
+//		    
+//		    post.setParameter("caseSearch", "Search");
+//		    post.setParameter("formAction", "");
+//		    post.setParameter("searchCourtroom", "");
+//		    post.setParameter("searchFipsCode", "059");
+//		    post.setParameter("searchHearingTime", "");
+//		    post.setParameter("searchHearingType", "");
+//		    post.setParameter("searchTerm", "11/12/2014");
+//		    
+//		    client.executeMethod(post);
+//			
+//			System.out.println(post.getResponseBodyAsString());
+			
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+		
+	}
+	
+	private Pattern nextPattern = Pattern.compile("value=\"Next\"");
+	private Pattern wrapPattern = Pattern.compile("<tr class=(.+?)</tr>", Pattern.DOTALL);
+	private Pattern tdPattern = Pattern.compile("(<td class=\"gridrow\".+?</td>)", Pattern.DOTALL);
+	
+	private int count = 0;
+
+	private void extractData(String code) {	
+		
+		pProc.addData(1, code);
+		textArea.append("Processing case " + code + "...");
+		System.out.print("Processing case " + code + "...");
+		
+		try {
+			PostMethod post = new PostMethod("http://epwsgdp1.courts.state.va.us/gdcourts/criminalCivilCaseSearch.do");
+			post.setRequestHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+		    post.setRequestHeader("Host", "epwsgdp1.courts.state.va.us");
+		    post.setRequestHeader("Referer", "	http://epwsgdp1.courts.state.va.us/gdcourts/criminalCivilCaseSearch.do?fromSidebar=true&formAction=searchLanding&searchDivision=T&searchFipsCode=059");
+		    
+		    post.setParameter("displayCaseNumber", code);
+		    post.setParameter("formAction", "submitCase");
+		    post.setParameter("searchDivision", "T");
+		    post.setParameter("searchFipsCode", "059");
+		    post.setParameter("searchType", "caseNumber");
+		   
+		    
+		    client.executeMethod(post);
+		    
+		    GetMethod get = new GetMethod("http://epwsgdp1.courts.state.va.us/gdcourts/criminalDetail.do?formAction=newSearch");
+		    get.setRequestHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+			get.setRequestHeader("Host", "epwsgdp1.courts.state.va.us");
+			get.setRequestHeader("Referer", "http://epwsgdp1.courts.state.va.us/gdcourts/criminalCivilCaseSearch.do?fromSidebar=true&formAction=searchLanding&searchDivision=T&searchFipsCode=059");
+			
+			client.executeMethod(get);
+			
+		    String html = get.getResponseBodyAsString();
+		   
+		    write(html);
+		    
+		    textArea.append("done" + "\n");
+		    textArea.setCaretPosition(textArea.getDocument().getLength());
+		    System.out.println("done");
+		    
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+	}
+
+	public static void main(String[] args) {
+		
+		
+		 startScrapeBtn = new JButton("Start scrape");
+		 startScrapeBtn.setSize(150, 30);
+		 startScrapeBtn.setLocation(225, 220);
+		 startScrapeBtn.addActionListener(new ActionListener() {
+			    final CaseExtractor c = new CaseExtractor();
+				@Override
+				public void actionPerformed(ActionEvent arg0) {
+					startScrapeBtn.setEnabled(false);
+					c.start();
+					
+				}
+				
+			});
+		
+		
+	}
+	
+	public void getCaptcha() {
+		try {
+			GetMethod get = new GetMethod("http://epwsgdp1.courts.state.va.us/gdcourts/captchaVerification.do?landing=landing");
+			get.setFollowRedirects(false);
+			
+			String location = "";
+			
+			client.executeMethod(get);
+
+			for (Header h : get.getResponseHeaders()) {
+				if (h.getName().contains("Location")) {
+					location = h.getValue();
+				}
+			}
+			
+			get = new GetMethod(location);
+			get.setRequestHeader("Accept", "image/png,image/*;q=0.8,*/*;q=0.5");
+			get.setRequestHeader("Host", "epwsgdp1.courts.state.va.us");
+			get.setRequestHeader("Referer", "http://epwsgdp1.courts.state.va.us/gdcourts/captchaVerification.do?landing=landing");
+			
+			get.setURI(new URI("http://epwsgdp1.courts.state.va.us/gdcourts/captcha.jpg", true));
+		    client.executeMethod(get);
+
+		    BufferedImage im = ImageIO.read(get.getResponseBodyAsStream());
+		    ImageIcon icon = new ImageIcon(im);
+		    
+		    JLabel label = new JLabel(icon);
+		    label.setSize(200, 75);
+		    
+		    
+		    captchaPanel.add(label);
+		    captchaPanel.repaint();
+		
+		    
+		    
+		    
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+	
+	private ArrayList<String> codes = new ArrayList<String>();
+
+	@Override
+	public void run() {
+		
+		codes = Files.loadListFromFile("input.txt");
+		
+		String response = captchaText.getText().trim();
+		String time = dateText.getText().trim();
+		
+		pProc = new PatternProcessor();
+		writter = new Writter("output_cases.csv");
+		writter.writeLine("Case Number, Defense Attorney, Charge, Case Type, Amended Charge, Amaneded Case Type, Final Disposition, Sentence Time, Suspended Sentence Time, Probation Type, Probation Time, Fine");
+		
+		pProc.addPattern(2, Pattern.compile("Defense Attorney&nbsp;:\\s*</td>\\s+.+?>\\&nbsp;(.+?)<"));
+		pProc.addPattern(3, Pattern.compile("Charge&nbsp;:\\s*</td>\\s+.+?>\\&nbsp;(.+?)<"));
+		pProc.addPattern(4, Pattern.compile("Case Type&nbsp;:\\s*</td>\\s+.+?>\\&nbsp;(.+?)<"));
+		pProc.addPattern(5, Pattern.compile("Amended Charge&nbsp;:s*</td>\\s+.+?>\\&nbsp;(.+?)<"));
+		pProc.addPattern(6, Pattern.compile("Amended Case Type&nbsp;:\\s*</td>\\s+.+?>\\&nbsp;(.+?)<"));
+		pProc.addPattern(7, Pattern.compile("Final Disposition&nbsp;:\\s*</td>\\s+.+?>\\&nbsp;\\s+(.+?)<", Pattern.DOTALL));
+		pProc.addPattern(8, Pattern.compile("Sentence Time&nbsp;:\\s*</td>\\s+.+?>\\&nbsp;(.+?)<"));
+		pProc.addPattern(9, Pattern.compile("Sentence Suspended Time&nbsp;:\\s*</td>\\s+.+?>\\&nbsp;(.+?)<"));
+		pProc.addPattern(10, Pattern.compile("Probation Type&nbsp;:\\s*</td>\\s+.+?>\\&nbsp;(.+?)<"));
+		pProc.addPattern(11, Pattern.compile("Probation Time&nbsp;:\\s*</td>\\s+.+?>\\&nbsp;(.+?)<"));
+		pProc.addPattern(12, Pattern.compile("Fine&nbsp;:\\s*</td>\\s+.+?>\\&nbsp;(.+?)<"));
+		
+		
+		try {		
+		
+		    PostMethod post = new PostMethod("http://epwsgdp1.courts.state.va.us/gdcourts/captchaVerification.do");
+		    post.setFollowRedirects(false);
+		    
+		    post.setRequestHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+		    post.setRequestHeader("Host", "epwsgdp1.courts.state.va.us");
+		    post.setRequestHeader("Referer", "http://epwsgdp1.courts.state.va.us/gdcourts/captchaVerification.do?landing=landing");
+		    
+		    post.setParameter("accept", "Accept");
+		    post.setParameter("j_captcha_response", response);
+		    post.setParameter("pageName", "landingCaptchaVerificationPage");
+		    post.setParameter("showCaptcha", "true");
+		    
+		    client.executeMethod(post);	    
+		    
+		    GetMethod get = new GetMethod("http://epwsgdp1.courts.state.va.us/gdcourts/caseSearch.do?fromSidebar=true&searchLanding=searchLanding&searchType=hearingDate&searchDivision=T&searchFipsCode=059");
+		    get.setRequestHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+			get.setRequestHeader("Host", "epwsgdp1.courts.state.va.us");
+			get.setRequestHeader("Referer", "http://epwsgdp1.courts.state.va.us/gdcourts/captchaVerification.do?landing=landing");
+			
+			client.executeMethod(get);
+		
+		} catch (Exception e) {
+			e.printStackTrace();
+		}	
+		
+		for (String code : codes) {
+			extractData(code);
+			sleep(2000);
+		}
+		
+		
+		writter.close();
+		textArea.append("FINISHED - Check file cases-" + time.replace("/", "-") + ".csv");
+		textArea.append("\n");
+		textArea.setCaretPosition(textArea.getDocument().getLength());
+	}
+	
+	@Override
+	public void write (String data) {		
+			
+		pProc.processPatterns(data, writter);
+		
+	}
+	
+}
+
+

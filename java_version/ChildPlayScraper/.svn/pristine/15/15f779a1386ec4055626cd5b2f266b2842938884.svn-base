@@ -1,0 +1,27 @@
+outputFile=monoprice.csv
+firstPage=1
+lastPage=
+pageIncrement=1
+baseUrl=http://www.monoprice.com
+paginationUrlPrefix=http://www.monoprice.com/Search/Index?keyword=&pg=
+paginationUrlSufix=&pagesize=150&itemsort=newest
+fetchPause=1000
+lastPageCheckPattern=(images/next.png)
+noDetailsPage=true
+noPagination=false
+
+detailsPagePattern=<div class="event_title"><h3><a href="(.+?)"
+detailsWrapPattern=<div class="row">(.+?)</table>\\s+</div>~true
+
+dataPattern1=<font style="font-size:14px;">(.+?)</font>
+dataPattern2=style="font-size:13px;">\\s+(.+?)\\s+</div>
+dataPattern3=Product ID:\\s+(.+?)\\s+</div>
+dataPattern4=<p class="hawk-itemPrice">\\s+(.+?)\\s+</p>
+dataPattern5=<div class="col-lg-5">\\s+<input type="(.+?)"
+dataPattern6=<img id="img-main.+?src="(.+?)"
+
+dataText1=
+dataText2=
+
+dataReplace1=
+dataReplace2=

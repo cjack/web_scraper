@@ -1,0 +1,179 @@
+package bots.australia_jarris;
+
+import master.Master;
+import util.*;
+
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.text.SimpleDateFormat;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.zip.GZIPInputStream;
+import java.util.*;
+
+import javax.swing.JTextArea;
+
+import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.HttpStatus;
+import org.apache.commons.httpclient.methods.PostMethod;
+
+public class LawlinkGUI extends Master {
+
+	Pattern tdWrapPattern = Pattern.compile("<tr class=\"r\\d\">(.+?)</tr>", Pattern.DOTALL);
+	Pattern tdPatt = Pattern.compile("<td>\\s*(.*?)\\s*</td>");
+	
+	private String date = "";
+	
+	private JTextArea textArea;
+	private StartClassGUI mainClassInstance;
+	
+	public LawlinkGUI(String date, JTextArea textArea, StartClassGUI mainClassInstance) {	
+		this.date = date;
+		this.textArea = textArea;
+		this.mainClassInstance = mainClassInstance;
+		
+		writter = new Writter("lawlink_out_"+date.replace("/", "_")+".csv");
+		writter.writeLine("List No,Date,Time,Listing Type,Jurisdiction,Court,Presiding Officer,Location,Court Room,Case Title/Party,Case Number");
+		
+		pProc = new PatternProcessor();
+		pProc.addReplacement(8, "<.+?>", "");
+		
+		firstPageNumber = 1;
+		pageIncrement = 30;
+		
+		paginationPattern = Pattern.compile(">Next</a>");
+	}	
+
+	public static void main(String[] args) {
+	//	new LawlinkGUI("john").start();	
+	}
+
+	@Override
+	public void run() {
+		fetchPageContent("http://searchcourtlists.lawlink.nsw.gov.au/scm/search");
+		
+		pageNumberParam = "resultsFrom";
+		pageNumberValuePartOne = "";							      
+		
+		postPageURL = "http://searchcourtlists.lawlink.nsw.gov.au/scm/search";
+		postMethodParams = new HashMap<String, String>();
+		
+		ArrayList<String> params = Files.loadListFromFile("properties/lawlink_props.txt");
+		for (String param : params) {
+			String parts [] = param.split("=");
+			
+			if (parts.length == 2) {
+				postMethodParams.put(parts[0], parts[1]);
+			} else {
+				postMethodParams.put(parts[0], "");
+			}
+			
+		}
+		
+		postMethodParams.put("party_name", this.date);		
+	
+		postMethodProcessing();
+		
+		System.out.println("lawlink.nsw.gov.au scrape FINISHED");
+		textArea.append("lawlink.nsw.gov.au scrape FINISHED\n");
+		textArea.append("Check file lawlink_out_"+this.date+".csv");
+		
+		this.mainClassInstance.enableGUIAgain();
+	}
+	
+	protected void postMethodProcessing() {
+		String pageHtml = null;
+		
+		int pageNum = 1;
+		
+		for (int i = firstPageNumber; i <= lastPageNumber; i += pageIncrement) {
+			postMethodParams.put(pageNumberParam, pageNumberValuePartOne + i);
+			System.out.println("Processing page " + i + " on lawlink.nsw.gov.au");
+			textArea.append("Processing page " + pageNum++ + " on lawlink.nsw.gov.au\n");
+			pageHtml = getHtmlByPost();
+		//	System.out.println(pageHtml);			
+
+			if (pageHtml != null) {
+				write(pageHtml);
+				
+				Matcher paginationMatcher = paginationPattern.matcher(pageHtml);
+				if (!paginationMatcher.find()) {
+					break;					
+				}
+				
+			} else {
+				fetchPageContent("http://searchcourtlists.lawlink.nsw.gov.au/scm/search");
+				i -= pageIncrement;
+			}
+			
+			sleep(3000);
+		}
+	}
+	
+	protected String getHtmlByPost() {
+		if (httpClient == null) {
+			httpClient = new HttpClient();
+		}
+		BufferedReader br;
+		StringBuffer html = new StringBuffer();
+		String temp;
+		PostMethod method = new PostMethod(postPageURL);
+
+		for (String param : postMethodParams.keySet()) {
+			method.addParameter(param, postMethodParams.get(param));
+		}
+
+		try {
+			int statusCode = httpClient.executeMethod(method);
+			if (statusCode == HttpStatus.SC_OK) {
+				br = new BufferedReader(new InputStreamReader(method.getResponseBodyAsStream(), charset));
+				while ((temp = br.readLine()) != null) {
+					html.append(temp).append("\n");
+				}
+
+				br.close();
+				
+				String pageHtml = html.toString();
+				
+				return pageHtml;
+			} else {
+				return null;
+			}
+		} catch (Exception e) {
+			System.err.println("#### GREŠKA ZA: " + postPageURL + " ####");
+			e.printStackTrace();			
+			return null;
+		}
+	}
+	
+	@Override
+	public void write (String data) {
+		ArrayList<String> tdWrapData = findAllInString(data, tdWrapPattern);
+		
+		for (String tdWrap : tdWrapData) {
+			ArrayList<String> tdData = findAllInString(tdWrap, tdPatt);
+			
+			for (int i = 1; i < tdData.size(); i++) {
+				if (i == 2) {
+					Date d = new Date(tdData.get(i));
+					Calendar c = Calendar.getInstance();
+					c.setTime(d);
+					tdData.set(i, new SimpleDateFormat("dd MMM").format(c.getTime()));					
+				}
+				if (i == 3) {
+					Date d = new Date(tdData.get(i));
+					Calendar c = Calendar.getInstance();
+					c.setTime(d);
+					tdData.set(i, new SimpleDateFormat("hh:mm").format(c.getTime()));	
+				}
+				pProc.addData(i, tdData.get(i));
+			}
+			
+			pProc.processPatterns(data, writter);
+		}
+		
+	}
+	
+}
+
+

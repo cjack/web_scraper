@@ -1,0 +1,365 @@
+package bots;
+
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.zip.GZIPInputStream;
+
+import org.apache.commons.httpclient.Header;
+import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.methods.GetMethod;
+
+import proxy.ProxyFetcher;
+
+import util.Files;
+import util.PatternProcessor;
+import util.Sha1Hash;
+import util.Utils;
+import util.Writter;
+
+import manta.MultithreadedProxyManta;
+import master.Master;
+
+public class Manta extends Master{
+
+	private Pattern sicCodePattern;
+	private Pattern naicsCodePattern;
+	private Pattern businessCategoriesWrapperPattern;
+	private Pattern businessCategoryPattern;
+	private Pattern provinceWrapPattern;
+	private Pattern provincePattern;
+	private ArrayList<String> provinces;
+	private Pattern subCategoriesWrapPattern;
+	private Pattern subCategoriesPattern;
+	private Pattern subCatOrPaginationPattern;
+	private ArrayList<String[]> subCategories;
+	private int krajStrane;
+	private int brojRekorda;
+	private Pattern krajStranePattern;
+	private ArrayList<String> businessCategories;
+	private int j;
+	
+	private ProxyFetcher proxyFetcher;
+	private MultithreadedProxyManta mtFethcer;
+
+	private Pattern servicesPattern = Pattern.compile("class=\"col-xs-12 col-sm-6 col-md-6 pln\">(.+?)<");
+	private Pattern businessCategoryPatternOther;
+	
+	public Manta() {
+		
+		writter = new Writter("manta.csv");
+		writter.writeLine("Business name,Address,City,State,Zip,Phone,Email,Website,Products & Services,Company contact,Company contact title,Location type,Year established,Annual revenue,Employees,SIC code,NAICS code,Business categories,Sub-category 1,Sub-category 2,Sub-category 3,Sub-category 4,Sub-category 5");
+		
+		pProc = new PatternProcessor();
+		proxyFetcher = new ProxyFetcher();
+		
+		baseURL = "http://www.manta.com";
+		
+		brojRekorda = 0;
+		
+		detailsPagePattern = Pattern.compile("<a href=\"(/ic/.+?)\".+?class=\"pull-left\"");
+		
+		pProc.addPattern(1, Pattern.compile("<h1 itemprop=\"name\".+?href.+?>(.+?)</a>"));
+		pProc.addPattern(2, Pattern.compile("streetAddress\">(.+?)</span>"));
+		pProc.addPattern(3, Pattern.compile("addressLocality\">(.+?)</span>"));
+		pProc.addPattern(4, Pattern.compile("addressRegion\">(.+?)</span>"));
+		pProc.addPattern(5, Pattern.compile("postalCode\">(.+?)</span>"));
+		pProc.addPattern(6, Pattern.compile("div itemprop=\"telephone\".+?Phone:(.+?)</div>"));
+		pProc.addPattern(7, Pattern.compile("div itemprop=\"email\">(.+?)<")); 
+		pProc.addPattern(8, Pattern.compile("a itemprop=\"url\".+?href.+?>Web:(.+?)</a>")); 
+		pProc.addPattern(10, Pattern.compile("<span itemprop=\"name\".+?\\s+.+?>(.+?)</a>"));
+		pProc.addPattern(11, Pattern.compile("<span itemprop=\"jobTitle\">(.+?)</span>"));
+		pProc.addPattern(12, Pattern.compile("rel=\"locationType\">(.+?)</td>"));
+		pProc.addPattern(13, Pattern.compile("itemprop=\"foundingDate\">(.+?)</td>"));
+		pProc.addPattern(14, Pattern.compile("rel=\"annualRevenue\">(.+?)</td>"));
+		pProc.addPattern(15, Pattern.compile("rel=\"numEmployees\">(.+?)</td>"));
+		
+		pProc.addReplacement(11, "&amp;", "&");
+			
+		sicCodePattern = Pattern.compile("rel=\"sicDetails\">.+?>(.+?)</span>(.+?)</td>"); //15
+		naicsCodePattern = Pattern.compile("rel=\"naicsDetails\">.+?>(.+?)</span>(.+?)</td>");	//16	
+		
+		businessCategoriesWrapperPattern = Pattern.compile("rel=\"businessCategories\"(.+?)</ul>", Pattern.DOTALL);
+		businessCategoryPattern = Pattern.compile("<li>(.+?)</li>");
+		
+		businessCategoryPatternOther = Pattern.compile("<p rel=\"businessCategories\">\\s+(.+?),");
+		
+		provinceWrapPattern = Pattern.compile("Browse provinces(.+?)navbar-link", Pattern.DOTALL);
+		provincePattern = Pattern.compile("li class.+?a.+?href=\"(.+?)\"",Pattern.DOTALL);
+	
+		subCategoriesWrapPattern = Pattern.compile("Browse Subcategories(.+?)</div>\\s*</div>\\s*</div>", Pattern.DOTALL);
+		subCategoriesPattern = Pattern.compile("<li class=.+?itemscope.+?href=\"(.+?)\".+?\\(([\\d,]+)\\)</li>", Pattern.DOTALL);
+		
+		//ako patern postoji znaci da ne trazimo kategorije,nego idemo po paginacionim stranama
+		subCatOrPaginationPattern = Pattern.compile("<a href=\"(/ic/.+?\".+?class=\"pull-left\")"); 
+		
+		krajStranePattern = Pattern.compile("h1 itemprop=\"description\".+?Manta has (.+?) companies",Pattern.DOTALL);
+		
+		mtFethcer = new MultithreadedProxyManta(pProc, writter);
+	}
+	
+	public void run() {
+				
+		String baseHtml = fetchPageContent("http://www.manta.com/world/North+America/Canada/building_construction--E0/"); //proxyFetcher.getHtmlWithProxy("http://www.manta.com/world/North+America/Canada/building_construction--E0/", "Construction in Canada");
+	
+		String provinceWraper = findInString(baseHtml, provinceWrapPattern);
+		
+		provinces = findAllInString(provinceWraper, provincePattern);
+		
+		provinces.remove(0);
+		
+		mtFethcer.start();
+	
+		mainFor:
+		for(String province : provinces) {
+			
+			String baseProvinceHtml = proxyFetcher.getHtmlWithProxy("http://www.manta.com" + province, "Construction in");
+			
+			String subCatPagination = findInString(baseProvinceHtml, subCatOrPaginationPattern);
+			
+			//ako je "" trazimo subCategories, inace radimo po paginacionim stranama
+			if(subCatPagination.equals("")) {
+				
+				String subCatWraper = findInString(baseProvinceHtml, subCategoriesWrapPattern);
+				
+				subCategories = findAllGroupsInString(subCatWraper, subCategoriesPattern);
+				
+				int catCount = 0;
+				
+				for(String[] subCategory : subCategories) {
+					
+				//	System.out.println(subCategory[0] + " - " + subCategory[1]);
+				//	if (1==1) continue;
+					
+					catCount++;
+					
+					if (catCount < 39) {						
+						continue;
+					}
+				
+					krajStrane = Integer.parseInt(subCategory[1].replaceAll(",", ""));
+					
+					firstPageNumber = 1;
+					pageIncrement = 1;
+					
+					incrementPartOneURL = "http://www.manta.com" + subCategory[0] + "?pg=" ;
+					
+					typeOneProcessing();
+					
+				//	break mainFor;
+				}
+				
+			} else { //odmah paginacija
+				
+				krajStrane = Integer.parseInt(findInString(baseProvinceHtml, krajStranePattern));
+				
+				firstPageNumber = 1;
+				pageIncrement = 1;
+				
+				incrementPartOneURL = "http://www.manta.com" + province + "?pg=" ;
+				
+				typeOneProcessing();				
+			}
+			
+			break mainFor;
+		}
+		
+		mtFethcer.paginationsDone();
+		
+		while (!mtFethcer.allWorkDone()) {
+			sleep(10000);
+			continue;
+		}
+	}
+	
+//	public void run () {
+//		ArrayList<String> urls = Files.loadListFromFile("input.txt");
+//				
+//		mtFethcer.addUrls(urls);
+//		
+//		mtFethcer.start();
+//		
+//		mtFethcer.paginationsDone();
+//		
+//		while (!mtFethcer.allWorkDone()) {
+//			sleep(10000);
+//			continue;
+//		}
+//		
+//	}
+	
+	protected void typeOneProcessing() {
+		paginationURL = null;
+		detailsPageURL = null;
+		String pageHtml = null;
+		String detailsPageHtml = null;
+		String carURLHash = null;
+
+		Matcher urlMatcher;
+		HashSet<String> carURLs;
+		int recordsOnThisPage = 0;
+
+		mainLoop: for (int i = firstPageNumber; i <= lastPageNumber; i += pageIncrement) {
+			paginationURL = incrementPartOneURL + formParam + formValue + pageNumberParam + i + incrementPartTwoURL;		
+			
+			pageHtml = proxyFetcher.getHtmlWithProxy(paginationURL, "Get Listed on Manta");
+			recordsOnThisPage = 0;
+			
+			//System.out.println(pageHtml);
+
+			if (pageHtml != null) {
+				System.out.println("-Pagination page: " + paginationURL);
+				errorCount = 0;
+								
+				urlMatcher = detailsPagePattern.matcher(pageHtml);
+				carURLs = new HashSet<String>();
+				while (urlMatcher.find()) {
+					brojRekorda++;
+					recordsOnThisPage++;
+					
+					detailsPageURL = urlMatcher.group(1);
+					if (!detailsPageURL.startsWith("http:")) {
+						detailsPageURL = baseURL + detailsPageURL;
+						//System.out.println(detailsPageURL);
+					}
+
+				//	if (!detailsPageURL.endsWith("/")) detailsPageURL = detailsPageURL + "/";
+					System.out.println("\t"+ detailsPageURL);
+					carURLHash = Sha1Hash.SHA1(detailsPageURL);
+
+					if (carURLs.contains(carURLHash)) {
+						continue;
+					} else {
+						carURLs.add(carURLHash);
+					}
+					
+					mtFethcer.addUrl(detailsPageURL);					
+					
+//					if(brojRekorda==krajStrane) {
+//						System.out.println("Izasao je");
+//						brojRekorda = 0;
+//						break mainLoop;
+//					} 
+				}
+				
+				if (recordsOnThisPage == 0) {
+					System.out.println("Izasao je");
+					brojRekorda = 0;
+					break mainLoop;
+				}
+			} 			
+		}
+	}
+	
+	public void write(String data) {
+		
+		String [] sicCode = findGroupsInString(data, sicCodePattern, 2);
+		
+		String [] naicsCode = findGroupsInString(data, naicsCodePattern, 2);
+		
+		if(sicCode != null) {
+			pProc.addData(16, sicCode[0]+sicCode[1]);
+		}else {
+			pProc.addData(16, "");
+		}
+		
+		if(naicsCode != null) {
+			pProc.addData(17, naicsCode[0]+naicsCode[1]);
+		}else {
+			pProc.addData(17, "");
+		}
+		
+		ArrayList<String> services = findAllInString(data, servicesPattern);
+		if (services.size()>0) {
+			pProc.addData(9, Utils.joinStringFromArray(services, ";"));
+		} else {
+			pProc.addData(9, "");
+		}
+		
+		
+		String businessWraper = findInString(data, businessCategoriesWrapperPattern);
+		
+		businessCategories = findAllInString(businessWraper, businessCategoryPattern);
+		
+		if (businessCategories.size() == 0) {
+			String business = findInString(data, businessCategoryPatternOther);
+			if (!business.equals("")) {
+				businessCategories.add(business);
+			}
+		}
+		
+		j=18;
+		
+		while(j<23) {
+			pProc.addData(j++, "");
+		}
+		
+		j=18;
+		
+		for(String business : businessCategories) {
+			pProc.addData(j++, business);
+		}
+		
+		pProc.processPatterns(data, writter);
+		
+	}
+	
+	public String fetchPageContent(String fromPage) {
+		try {
+			if (httpClient == null) {
+				httpClient = new HttpClient();
+			}
+			
+			GetMethod get = new GetMethod(fromPage);
+			get.setRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:33.0) Gecko/20100101 Firefox/33.0");
+			get.setRequestHeader("Host", "www.manta.com");
+			get.setRequestHeader("Cookie", "viewedOuibounceModal=true;");
+			get.setRequestHeader("Accept-Encoding", "gzip, deflate");
+			get.setRequestHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+			get.setRequestHeader("Accept-Language", "sr,sr-RS;q=0.8,sr-CS;q=0.6,en-US;q=0.4,en;q=0.2");
+			get.setRequestHeader("Connection", "keep-alive");
+			
+			httpClient.executeMethod(get);
+			
+			StringBuilder sb = new StringBuilder();
+			String line;
+			BufferedReader in = new BufferedReader(new InputStreamReader(new GZIPInputStream(get.getResponseBodyAsStream())));
+			while ((line = in.readLine()) != null) {
+				sb.append(line).append("\n");
+			}
+			
+//			for (Header h : get.getResponseHeaders()) {
+//				System.out.println(h.getName() + " - " + h.getValue());
+//			}
+//			
+//			System.out.println("======================================");
+//			
+//			for (Header h : get.getResponseHeaders()) {
+//				System.out.println(h.getName() + " - " + h.getValue());
+//			}
+			
+			in.close();
+			get.releaseConnection();
+			
+			String toReturn = sb.toString();
+
+			if (toReturn.trim().equals("") || !toReturn.contains("Construction in") || !toReturn.contains("</html>") || toReturn.contains("Suspicious Activity Detected")) {
+				return null;
+			} 			
+			
+			return toReturn;			
+		} catch (Exception e) {
+			System.err.println("#### GREŠKA ZA: " + fromPage + " ####");
+			e.printStackTrace();			
+			return null;
+		}
+	}
+
+	public static void main(String[] args) {		
+		new Manta().run();
+	}
+
+}

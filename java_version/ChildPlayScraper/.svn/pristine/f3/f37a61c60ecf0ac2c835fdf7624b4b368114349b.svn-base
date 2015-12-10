@@ -1,0 +1,37 @@
+package bots;
+
+import java.awt.event.KeyEvent;
+import java.awt.event.KeyListener;
+
+import javax.swing.JTextField;
+
+public class MyKeyListener implements KeyListener {
+	
+	private JTextField textField;
+	private Game game;
+	
+	public MyKeyListener(JTextField textField, Game game) {
+		super();
+		this.textField = textField;
+		this.game = game;
+	}
+
+	@Override
+	public void keyTyped(KeyEvent e) {
+		game.setNote(this.textField.getText() + e.getKeyChar());
+
+	}
+
+	@Override
+	public void keyPressed(KeyEvent e) {
+		// TODO Auto-generated method stub
+
+	}
+
+	@Override
+	public void keyReleased(KeyEvent e) {
+		// TODO Auto-generated method stub
+
+	}
+
+}

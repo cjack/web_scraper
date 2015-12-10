@@ -1,0 +1,361 @@
+package bots;
+
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.io.PrintWriter;
+import java.net.URL;
+import java.sql.DriverManager;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.zip.GZIPInputStream;
+
+import org.apache.commons.httpclient.Header;
+import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.methods.GetMethod;
+import org.apache.commons.httpclient.methods.PostMethod;
+import org.apache.commons.httpclient.protocol.Protocol;
+
+import loaders.PropertiesLoader;
+import master.Master;
+import util.DBWorks;
+import util.MySSLSocketFactory;
+import util.Sha1Hash;
+import util.Utils;
+
+public class HBSupplies extends Master {
+	
+	private PrintWriter csvOut;
+	
+	private HttpClient client = null;
+
+	
+	private String cookie;
+
+	private Pattern idpattern;
+
+	private Pattern imagePattern;
+
+	private Pattern skuPattern;
+	
+	private HashSet<String> idsDone = new HashSet<String>();
+
+	public HBSupplies()	{		
+	//	PropertiesLoader.init("sambro.txt");
+	//	initDatabase();
+		initWritters();
+		loadIDsDone();
+	//	DBWorks.init("psytoday");
+		
+		firefoxMask = true;
+		recordCount = 1;
+		requestDelay = 2000;
+		
+		idpattern = Pattern.compile("id=\\\\\"product-(\\d+)\\\\\".+?code\\\\\">(.+?)\\s+-");
+		imagePattern = Pattern.compile("img src=\\\\\"(.+?)\\\\\"");
+		skuPattern = Pattern.compile("Code:<\\\\/strong>\\s(.+?)\\s+-\\s+(.+?)<");
+		
+		login();
+		
+		
+		
+
+	}
+	
+	private void loadIDsDone() {
+		try {			
+			BufferedReader in = new BufferedReader(new FileReader("input.txt"));
+			String line = null;
+			
+			while ((line = in.readLine()) != null) {
+				
+				String parts [] = line.split(",");
+				parts[0] = parts[0].replaceAll("\"", "");
+				idsDone.add(parts[0]);
+			}
+			
+			in.close();
+		} catch (Exception e) {
+			// TODO: handle exception
+		}
+		
+	}
+
+	private void login() {
+		try {
+		//	Protocol.registerProtocol("https", 	new Protocol("https", new MySSLSocketFactory(), 443));
+			
+			client = new HttpClient();
+			System.out.print("Loginig in... ");
+						
+		//	GetMethod get = new GetMethod("https://www.sambro.co.uk/customer/account/login/");
+			
+		//	get.setRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:31.0) Gecko/20100101 Firefox/31.0");
+		//	client.executeMethod(get);
+			
+			
+			PostMethod post = new PostMethod("http://www.hbsupplies.co.uk/login-process.php");
+			post.setFollowRedirects(false);
+			post.setParameter("password", "audio");
+			post.setParameter("email_address", "princejames11@gmail.com");
+			post.setParameter("language", "en");
+			post.setParameter("login_button", "Login");
+			
+			post.setRequestHeader("Host", "www.hbsupplies.co.uk");
+			post.setRequestHeader("Referer", "http://www.hbsupplies.co.uk/login.php");
+						
+			client.executeMethod(post);		
+			
+//			for (Header h : post.getResponseHeaders()) {
+//			//	System.out.println(h.getName() + " - " + h.getValue());
+//				if (h.getValue().contains("frontend")) {
+//					cookie = h.getValue() + "; currency=GBP";
+//				}
+//			}
+			
+//			for (Header h : post.getResponseHeaders()) {
+//			System.out.println(h.getName() + " - " + h.getValue());
+//		}
+			
+			post = new PostMethod("http://www.hbsupplies.co.uk/my-account/price-list/ajax-load-price-list.php");
+			
+			client.executeMethod(post);
+			
+			ArrayList<String> idsList = findAllInString(getData(post), idpattern);
+			
+			int counter = 1;
+			
+			for (String id : idsList) {
+				
+				String parts[] = id.split("~");
+				
+				if (idsDone.contains(parts[1])) {
+					continue;
+				}
+				
+				System.out.println(counter++);
+				post = new PostMethod("http://www.hbsupplies.co.uk/my-account/price-list/ajax-product-info.php");
+				post.addParameter("product_id", parts[0]);
+				
+				client.executeMethod(post);
+				
+				String data = getData(post);
+				
+				write(data);
+			}
+			
+			GetMethod get = new GetMethod();
+			
+//			get = new GetMethod("https://www.sambro.co.uk/customer/account/");
+//			get.setRequestHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+//			get.setRequestHeader("Host", "www.sambro.co.uk");
+//			get.setRequestHeader("Connection", "keep-alive");
+//			get.setRequestHeader("Accept-Language", "en-US,en;q=0.5");
+//			get.setRequestHeader("Content-Encoding", "gzip, deflate");
+//			get.setRequestHeader("Referer", "https://www.sambro.co.uk/customer/account/login/");
+//			get.setRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:31.0) Gecko/20100101 Firefox/31.0");
+//			
+//			client.getState().clearCookies();
+//			get.setRequestHeader("Cookie", cookie);
+//			client.executeMethod(get);
+			
+//			System.out.println("Req Headers");
+//			for (Header h : get.getRequestHeaders()) {
+//				System.out.println(h.getName() + " - " + h.getValue());
+//			}
+//			
+//			for (Header h : get.getResponseHeaders()) {
+//				System.out.println(h.getName() + " - " + h.getValue());
+//			}
+			
+			StringBuilder sb = new StringBuilder();
+			BufferedReader in = new BufferedReader(new InputStreamReader(get.getResponseBodyAsStream()));
+			String line = null;
+			
+			while ((line = in.readLine()) != null) {
+				sb.append(line);
+				sb.append("\n");
+			}
+			
+			in.close();
+			
+		//	System.out.println(sb.toString());
+			System.out.println("done");
+			
+			System.out.print("Getting categories...");
+			
+			
+			System.out.println("done");
+		//	System.exit(0);
+			
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+		
+	}
+	
+	public ArrayList<String> findAllInString(String string, Pattern pattern) {
+		ArrayList<String> list = new ArrayList<String>();
+		
+		Matcher m = pattern.matcher(string);
+		while (m.find()) {
+			String value = m.group(1).trim() + "~" + m.group(2).trim();
+			list.add(value);
+		}
+		
+		return list;
+		
+		
+	}
+	
+	private String getData(PostMethod post) {
+		try {
+			BufferedReader in = new BufferedReader(new InputStreamReader(post.getResponseBodyAsStream()));
+			String line;
+			StringBuilder sb = new StringBuilder();
+			
+			while ((line = in.readLine()) != null) {
+				sb.append(line);
+			}
+			
+			return sb.toString();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+		return null;
+	}
+
+	private void initWritters() {
+		try {
+			csvOut = new PrintWriter(new OutputStreamWriter(new FileOutputStream("hbsuplies.csv"), "UTF-8"));
+			csvOut.print("SKU,Product Code,Image");
+			csvOut.print("\n");		
+						
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+	}
+	
+	private void writeLine(PrintWriter out, String text) {
+		try {
+			
+			out.println(text);
+		//	out.print("\n");
+			out.flush();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+	
+	private void writeLine(BufferedWriter out, String text) {
+		try {
+			out.write(text);
+			out.newLine();
+			out.flush();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+	
+	private void writeSpecs(String doctor, ArrayList<String> specs, BufferedWriter out) {
+		for (String spec : specs) {
+			writeLine(out, formatValue(doctor) + formatValueWithoutAppend(spec));
+		}
+	}
+
+	public void write(String data) {
+		
+		String imageUrl = findInString(data, imagePattern);
+		String [] parts = findGroupsInString(data, skuPattern, 2);
+		
+		StringBuilder sb = new StringBuilder();
+		sb.append(formatValue(parts[0])).append(formatValue(parts[1])).append(formatValue(imageUrl.replaceAll("\\\\", "")));
+		writeLine(csvOut, sb.toString());
+		
+	}
+	
+	
+
+	public static void main(String[] args) {
+		
+		new HBSupplies().run();
+	}
+	
+	public String fetchPageContent(String fromPage) {
+		try {
+			
+			GetMethod get = new GetMethod(fromPage);
+			client.executeMethod(get);
+			
+			StringBuilder sb = new StringBuilder();
+			String line;
+			BufferedReader in = new BufferedReader(new InputStreamReader(get.getResponseBodyAsStream()));
+			while ((line = in.readLine()) != null) {
+				sb.append(line).append("\n");
+			}
+			
+			in.close();
+			get.releaseConnection();
+			
+			return sb.toString();			
+		} catch (Exception e) {
+			System.err.println("#### GREŠKA ZA: " + fromPage + " ####");
+			e.printStackTrace();			
+			return null;
+		}
+	}
+
+	@Override
+	public void run() {
+		typeOneProcessing();
+		
+		processingEnd();
+	}
+	
+	public void processingEnd() {
+		try {
+			csvOut.close();
+			
+		//	copyFileUsingStream(new File("sambro.csv"), new File("../sambro.csv"));
+		//	copyFileUsingStream(new File("channelmax-ftp-jamesutility.txt"), new File("../channelmax-ftp-jamesutility.txt"));
+		} catch (Exception e) {
+			// TODO: handle exception
+		}
+		System.out.println("Crawl finished!");
+	}
+	
+	private static void copyFileUsingStream(File source, File dest) throws IOException {
+	    InputStream is = null;
+	    OutputStream os = null;
+	    try {
+	        is = new FileInputStream(source);
+	        os = new FileOutputStream(dest);
+	        byte[] buffer = new byte[1024];
+	        int length;
+	        while ((length = is.read(buffer)) > 0) {
+	            os.write(buffer, 0, length);
+	        }
+	    } finally {
+	        is.close();
+	        os.close();
+	    }
+	}
+	
+		
+}
+
+

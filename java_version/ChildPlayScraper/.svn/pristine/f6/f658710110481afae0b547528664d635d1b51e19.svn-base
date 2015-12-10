@@ -1,0 +1,199 @@
+package bots;
+
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.FileReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.net.URL;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashSet;
+import java.util.Properties;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import proxy.MultithreadedProxyFetcher;
+import proxy.ProxyFetcher;
+
+import util.Files;
+import util.PatternProcessor;
+import util.Sha1Hash;
+import util.Writter;
+
+import master.Master;
+
+public class YellowPagesMK extends Master {
+
+	private SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy");
+	ProxyFetcher proxyFetcher;
+	private String [] states;
+	private String [] categories;
+	private boolean allOnProxies;
+	private boolean multithreaded;
+	private Pattern titlePattern;
+	private Pattern postCodePattern;
+	
+	private MultithreadedProxyFetcher mpFetcher;
+	
+	private Pattern categorySubCategoryNamePattern;
+	private String[] catSubCatName;
+	
+	public YellowPagesMK() {
+		
+		Properties properties = new Properties();
+		try {
+			properties.load(new FileReader("yellProps.txt"));
+			states = properties.getProperty("states").split(",");
+			categories = properties.getProperty("categories").split(",");
+			firstPageNumber = Integer.parseInt(properties.getProperty("firstPage"));
+			allOnProxies = Boolean.parseBoolean(properties.getProperty("fullOnProxies"));
+			multithreaded = Boolean.parseBoolean(properties.getProperty("multithreaded"));
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+		proxyFetcher = new ProxyFetcher();
+				
+		pProc = new PatternProcessor();
+		
+		baseURL = "http://en.yp.mo";
+		detailsPagePattern = Pattern.compile("<h4 class=\"title\"><a.+?href=\"(.+?)\"");
+		paginationPattern = Pattern.compile("Next <strong>&raquo;");
+		
+		pProc.addPattern(4, Pattern.compile("<strong style=\"display:block;font:16px/1.2 georgia, serif;margin-bottom:3px;\">(.+?)<")); //address
+		pProc.addPattern(5, Pattern.compile("<br\\s*/>Phone:\\s*<span>(.+?)<"));
+		pProc.addPattern(6, Pattern.compile("mailto:(.+?)\""));
+		pProc.addPattern(7, Pattern.compile("<a href=\"(http:.+?)\".+?Visit Website"));
+		
+	//	firstPageNumber = 1;
+		pageIncrement = 1;
+		
+		incrementPartOneURL = "http://en.yp.mo/business/?page=";
+		incrementPartTwoURL = "&order=&search=1&q=&location=";
+		
+	}
+	
+	protected void typeOneProcessing() {
+		paginationURL = null;
+		detailsPageURL = null;
+		String pageHtml = null;
+		String detailsPageHtml = null;
+		String carURLHash = null;
+		long carID;
+		int errorDelay = initialErrorDelay;
+
+		Matcher paginationMatcher;
+		Matcher urlMatcher;
+		HashSet<String> carURLs;
+
+		mainLoop: for (int i = firstPageNumber; i <= lastPageNumber; i += pageIncrement) {
+			paginationURL = incrementPartOneURL + formParam + formValue + pageNumberParam + i + incrementPartTwoURL;
+			pageHtml = proxyFetcher.getHtmlWithProxy(paginationURL, "Yellow Pages");
+			
+			//System.out.println(pageHtml);
+
+			if (pageHtml != null) {
+				System.out.println("-Pagination page: " + paginationURL);
+				errorCount = 0;
+				errorDelay = initialErrorDelay;
+				urlMatcher = detailsPagePattern.matcher(pageHtml);
+				carURLs = new HashSet<String>();
+				while (urlMatcher.find()) {
+					detailsPageURL = urlMatcher.group(1);
+					if (!detailsPageURL.startsWith("http:")) {
+						detailsPageURL = baseURL + detailsPageURL;
+						//System.out.println(detailsPageURL);
+					}
+
+					detailsPageURL = fixURL(detailsPageURL);
+					System.out.println("\t"+ detailsPageURL);
+					carURLHash = Sha1Hash.SHA1(detailsPageURL);
+
+					if (carURLs.contains(carURLHash)) {
+						continue;
+					} else {
+						carURLs.add(carURLHash);
+					}
+					
+
+					if (allOnProxies) {
+						if (multithreaded) {
+							mpFetcher.addUrl(detailsPageURL);
+							continue;
+						} else {
+							detailsPageHtml = proxyFetcher.getHtmlWithProxy(detailsPageURL, "Yellow Pages");
+						}
+					} else {
+						detailsPageHtml = getHtml(detailsPageURL);
+					}					
+
+					if (detailsPageHtml != null) {
+						write(detailsPageHtml);
+						recordCount++;
+						newRecordsCount++;						
+					}					
+					
+				}
+				paginationMatcher = paginationPattern.matcher(pageHtml);
+				if (!paginationMatcher.find()) 
+					break;
+			}
+		}
+	}
+	
+	
+		
+	public void write(String pageHtml) {		
+
+	}
+	
+	
+	
+	public static void main(String[] args) {		
+		new YellowPagesMK().run();
+	}
+	
+	
+	
+	public void run() {
+			
+		writter = new Writter("yellowPagesMacau.csv");
+		writter.writeLine("Company name,Category,Sub category,Address,Phone,Email,Website");
+		
+		if (multithreaded) {
+			mpFetcher = new MultithreadedProxyFetcher(pProc, writter, proxyFetcher);
+			mpFetcher.start();
+		}
+		
+		
+		
+		typeOneProcessing();
+		
+		if (multithreaded) {
+			mpFetcher.paginationsDone();
+			while (true) {
+				String html = mpFetcher.getHtml();
+				if (html == null) break;
+				if (html.equals("")) {
+					sleep(3000);
+					continue;
+				}
+				
+				write(html);
+			}
+			
+		} 
+		
+
+		
+		writter.close();
+		processingEnd();
+		
+	}
+
+}

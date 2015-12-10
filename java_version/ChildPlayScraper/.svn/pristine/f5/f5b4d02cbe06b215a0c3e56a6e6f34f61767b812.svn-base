@@ -1,0 +1,111 @@
+package bots;
+
+import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import util.*;
+import master.Master;
+
+
+public class YellowPagesCoZa extends Master {
+
+	public YellowPagesCoZa(Integer firstPage, Integer lastPage) {		
+		this();
+		firstPageNumber = firstPage;
+		lastPageNumber = lastPage;
+	}
+	
+	public YellowPagesCoZa() {		
+		writter = new Writter("yellow_co_za.csv");
+		writter.writeLine("Category,Name,E-Mail,Website,Telephone");
+		
+		pProc = new PatternProcessor();
+		
+		pProc.addPattern(2, Pattern.compile("\"name\":\"(.+?)\""));
+		pProc.addPattern(3, Pattern.compile("\"email\":\"(.*?)\""));
+		pProc.addPattern(4, Pattern.compile("\"website\":\"(.*?)\""));
+		pProc.addPattern(5, Pattern.compile("\"tel\":\\{\"main\":\"(.*?)\""));		
+		
+		paginationPattern = Pattern.compile(">Next</a>");
+	
+	//	firefoxMask = true;
+	}	
+
+	public static void main(String[] args) {
+		if (args.length == 2) {
+			new YellowPagesCoZa(Integer.parseInt(args[0]), Integer.parseInt(args[1])).start();
+		} else {
+			new YellowPagesCoZa().start();
+		}
+		
+	}
+	
+	Pattern resultsWrap = Pattern.compile("\"results\":\\[(.+?)\\]", Pattern.DOTALL);
+	Pattern resultPattern = Pattern.compile("\\{(.+?)accountStatusFilters", Pattern.DOTALL);
+
+	@Override
+	public void run() {
+		ArrayList<String> categories = Files.loadListFromFile("input.txt");
+		for (String category : categories) {
+			String catParts[] = category.split("~");
+			
+			pProc.addData(1, catParts[0]);
+			
+			firstPageNumber = 1;
+			pageIncrement = 1;
+			incrementPartOneURL = "http://www.yellowpages.co.za/search/" + catParts[1] + "/";
+			
+			typeOneProcessing();
+			
+		}
+		
+		writter.close();
+	}
+	
+	protected void typeOneProcessing() {
+		paginationURL = null;
+		String pageHtml = null;
+
+		Matcher paginationMatcher;		
+		
+		mainLoop: for (int i = firstPageNumber; i <= lastPageNumber; i += pageIncrement) {
+			paginationURL = incrementPartOneURL + i + incrementPartTwoURL;
+			pageHtml = getHtml(paginationURL);
+			
+			sleep(3000);
+			
+		//	System.out.println(pageHtml);
+
+			
+			if (pageHtml != null) {
+				System.out.println("-Pagination page: " + paginationURL);
+				
+				String resWrap = findInString(pageHtml, resultsWrap);
+				ArrayList<String> ads = findAllInString(resWrap, resultPattern); 
+						
+				
+				for (String adText : ads) {
+										
+					write(adText);
+					recordCount++;					
+					
+				}
+				paginationMatcher = paginationPattern.matcher(pageHtml);
+				if (!paginationMatcher.find()) {
+					break;					
+				}
+				
+				sleep(requestDelay);
+			} 
+		}
+	}
+	
+	@Override
+	public void write (String data) {
+		pProc.processPatterns(data, writter);
+	}
+	
+}
+
+

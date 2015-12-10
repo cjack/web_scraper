@@ -1,0 +1,50 @@
+package main;
+
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.InetSocketAddress;
+import java.net.Proxy;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Properties;
+import java.util.regex.Pattern;
+import java.util.zip.GZIPInputStream;
+
+import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.methods.GetMethod;
+import org.apache.commons.httpclient.methods.PostMethod;
+
+import util.Files;
+import util.Patterns;
+import util.Utils;
+import util.Writter;
+
+public class TestHtml {
+
+	public static void main(String[] args) {
+		HttpClient client = new HttpClient();
+		
+	//	GetMethod get = new GetMethod("http://www.amazon.com/mn/search/ajax/ref=sr_pg_2?rh=n%3A165793011%2Cn%3A%21165795011%2Cn%3A196601011%2Cn%3A2522032011%2Cp_36%3A5000-7000&page=2&bbn=2522032011&ie=UTF8&qid=1440496918&fromHash=&fromRH=n%3A165793011%2Cn%3A%21165795011%2Cn%3A196601011%2Cn%3A2522032011%2Cp_36%3A5000-7000&section=BTF&fromApp=gp%2Fsearch&fromPage=results&fromPageConstruction=auisearch&version=2&oqid=1440496951&atfLayout=default");
+		GetMethod get = new GetMethod("http://www.monoprice.com/Search/Index?keyword=&pg=1&pagesize=150");
+
+		get.setRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:39.0) Gecko/20100101 Firefox/39.0");
+		get.setRequestHeader("Accept-Encoding", "gzip, deflate");
+		get.setRequestHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+		get.setRequestHeader("Accept-Language", "sr,sr-RS;q=0.8,sr-CS;q=0.6,en-US;q=0.4,en;q=0.2");
+		get.setRequestHeader("Connection", "keep-alive");
+		get.setRequestHeader("Host", "www.monoprice.com");
+		
+		try {
+			client.executeMethod(get);
+			System.out.println(Utils.getHtml(get));
+			
+		} catch (Exception e) {
+			// TODO: handle exception
+		}
+		
+
+	}
+}

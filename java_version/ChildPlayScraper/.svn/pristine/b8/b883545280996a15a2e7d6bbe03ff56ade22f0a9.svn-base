@@ -1,0 +1,223 @@
+package bots;
+
+import master.Master;
+import util.*;
+
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.util.regex.Pattern;
+import java.util.zip.GZIPInputStream;
+import java.util.*;
+
+import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.HttpStatus;
+import org.apache.commons.httpclient.cookie.CookiePolicy;
+import org.apache.commons.httpclient.methods.PostMethod;
+import org.apache.commons.httpclient.params.HttpMethodParams;
+
+public class Campagnamica extends Master {
+
+	public Campagnamica(Integer firstPage, Integer lastPage) {		
+		this();
+		firstPageNumber = firstPage;
+		lastPageNumber = lastPage;
+	}
+	
+	Pattern productPattern = Pattern.compile("<h5 class='nome-dato'>\\s+(.+?)<");
+	int anotherCounter = 1;
+	
+	public Campagnamica() {		
+		firstPageNumber = 1;
+		pageIncrement = 1;
+		
+		firefoxMask = true;
+		
+		writter = new Writter("Campagnamica.csv");
+		writter.writeLine("Company Name,Email Address,Website Link,Region,Sub Region,City,Address,Product Type,Phone,Cellulare");
+		
+		pProc = new PatternProcessor();
+		
+		pProc.addPattern(1, Pattern.compile("<h1>\\s+(.+?)<"));
+		pProc.addPattern(2, Pattern.compile("<a\\s+href='mailto:(.*?)'"));
+		pProc.addPattern(3, Pattern.compile("Sito web: </strong><a href='(.*?)'"));
+		pProc.addData(4, "");
+		pProc.addData(5, "");
+		pProc.addPattern(6, Pattern.compile("<h3 class=\"address\">\\s+.+?\\d{5}\\s+(.+?)<"));
+		pProc.addPattern(7, Pattern.compile("<h3 class=\"address\">\\s+(.+?)<"));
+		pProc.addPattern(9, Pattern.compile("Telefono: </strong>(.+?)<"));
+		pProc.addPattern(10, Pattern.compile("Cellulare: </strong>(.+?)<"));
+		
+		
+	}	
+
+	public static void main(String[] args) {
+		if (args.length == 2) {
+			new Campagnamica(Integer.parseInt(args[0]), Integer.parseInt(args[1])).start();
+		} else {
+			new Campagnamica().start();
+		}
+		
+	}
+
+	@Override
+	public void run() {
+		String pageHtml = fetchPageContent("http://www.campagnamica.it/cerca/Pagine/SearchResult.aspx?Prod=00000000-0000-0000-0000-000000000000&Reg=-1&Ambito=fattoria");
+		
+		if (pageHtml != null) {
+			ArrayList<String> detailPages = findAllInString(pageHtml, detailsPattern);
+			System.out.println("Got " + detailPages.size() + " links");
+			
+			for (String firmLink : detailPages) {
+				if (compaies.contains(firmLink)) {
+					System.out.println("Contains " + firmLink);						
+				} else {
+					compaies.add(firmLink);
+				}
+				
+				String html = fetchPageContent("http://www.campagnamica.it" + firmLink);
+				write(html);
+				
+			}
+			
+		}
+				
+		String viewstate = findInString(pageHtml, Pattern.compile("id=\"__VIEWSTATE\" value=\"(.+?)\""));
+		String eventValidation = findInString(pageHtml, Pattern.compile("id=\"__EVENTVALIDATION\" value=\"(.+?)\""));
+		String requestDigest = findInString(pageHtml, Pattern.compile("id=\"__REQUESTDIGEST\" value=\"(.+?)\""));
+		
+		pageNumberParam = "__EVENTTARGET";
+		pageNumberValuePartOne = "ctl00$ctl21$g_7cb8b7d8_0bf4_42df_9e6e_bf306cb19dcd$ctl00$risultatiPager$ctl01$ctl";							      
+		
+		postPageURL = "http://www.campagnamica.it/cerca/Pagine/SearchResult.aspx?Prod=00000000-0000-0000-0000-000000000000&Reg=-1&Ambito=fattoria";
+		postMethodParams = new HashMap<String, String>();
+		
+		ArrayList<String> params = Files.loadListFromFile("params1.txt");
+		for (String param : params) {
+			String parts [] = param.split("=");
+			
+			if (parts.length == 2) {
+				postMethodParams.put(parts[0], parts[1]);
+			} else {
+				postMethodParams.put(parts[0], "");
+			}
+			
+		}
+		
+		postMethodParams.put("__EVENTVALIDATION", eventValidation);		
+		postMethodParams.put("__REQUESTDIGEST", requestDigest);
+		postMethodParams.put("__VIEWSTATE", viewstate);
+		postMethodParams.put("ctl00$PlaceHolderSearchArea$ctl01$ctl00", "http://www.campagnamica.it/cerca");
+		postMethodParams.put("ctl00$PlaceHolderSearchArea$ctl01$ctl04", "0");
+		postMethodParams.put("ctl00$ctl21$g_7cb8b7d8_0bf4_42df_9e6e_bf306cb19dcd$ctl00$ddlProdotto", "00000000-0000-0000-0000-000000000000");
+		postMethodParams.put("ctl00$ctl21$g_7cb8b7d8_0bf4_42df_9e6e_bf306cb19dcd$ctl00$ddlRegione", "0");
+		
+		postMethodProcessing();
+		
+	}
+	
+	Pattern detailsPattern = Pattern.compile("<a href=\"(/cerca/Pagine/SearchDetailResult.aspx.+?)\">");
+	HashSet<String> compaies = new HashSet<>();
+	
+	protected void postMethodProcessing() {
+		String pageHtml = null;
+
+		for (int i = firstPageNumber; i <= lastPageNumber; i += pageIncrement) {
+			postMethodParams.put(pageNumberParam, "ctl00$ctl21$g_7cb8b7d8_0bf4_42df_9e6e_bf306cb19dcd$ctl00$risultatiPager$ctl02$ctl00");
+			System.out.println("Processing page " + i);
+			pageHtml = getHtmlByPost();
+		//	System.out.println(pageHtml);			
+
+			if (pageHtml != null) {
+				ArrayList<String> detailPages = findAllInString(pageHtml, detailsPattern);
+				System.out.println("Got " + detailPages.size() + " links");
+				
+				for (String firmLink : detailPages) {
+					if (compaies.contains(firmLink)) {
+						System.out.println("Contains " + firmLink);						
+					} else {
+						compaies.add(firmLink);
+					}
+					
+					String html = fetchPageContent("http://www.campagnamica.it" + firmLink);
+					write(html);
+					
+				}
+				
+			} else {
+				errorCount++;				
+			}
+			
+			sleep(3000);
+		}
+	}
+	
+	protected String getHtmlByPost() {
+		if (httpClient == null) {
+			httpClient = new HttpClient();
+		}
+		BufferedReader br;
+		StringBuffer html = new StringBuffer();
+		String temp;
+		PostMethod method = new PostMethod(postPageURL);
+
+		
+		method.setRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/34.0.1847.131 Safari/537.36");
+		method.setRequestHeader("Referer", "http://www.campagnamica.it/cerca/Pagine/SearchResult.aspx?Prod=00000000-0000-0000-0000-000000000000&Reg=-1&Ambito=fattoria");
+		method.setRequestHeader("Host", "www.campagnamica.it");
+		method.setRequestHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+		method.setRequestHeader("Accept-Encoding", "gzip, deflate");
+		method.setRequestHeader("Accept-Language", "sr,sr-rs;q=0.8,sr-cs;q=0.6,en-us;q=0.4,en;q=0.2");
+		method.setRequestHeader("Cache-Control", "max-age=0");
+		method.setRequestHeader("Connection", "keep-alive");
+		method.setRequestHeader("Cookie", "__utmli=ctl00_ctl21_g_7cb8b7d8_0bf4_42df_9e6e_bf306cb19dcd_ctl00_risultatiPager");
+		
+		
+
+		for (String param : postMethodParams.keySet()) {
+			method.addParameter(param, postMethodParams.get(param));
+		}
+
+		try {
+			int statusCode = httpClient.executeMethod(method);
+			if (statusCode == HttpStatus.SC_OK) {
+				br = new BufferedReader(new InputStreamReader(new GZIPInputStream(method.getResponseBodyAsStream()), charset));
+				while ((temp = br.readLine()) != null) {
+					html.append(temp).append("\n");
+				}
+
+				br.close();
+				
+				String pageHtml = html.toString();
+				
+				String viewstate = findInString(pageHtml, Pattern.compile("id=\"__VIEWSTATE\" value=\"(.+?)\""));
+				String eventValidation = findInString(pageHtml, Pattern.compile("id=\"__EVENTVALIDATION\" value=\"(.+?)\""));
+				String requestDigest = findInString(pageHtml, Pattern.compile("id=\"__REQUESTDIGEST\" value=\"(.+?)\""));
+				
+				postMethodParams.put("__EVENTVALIDATION", eventValidation);		
+				postMethodParams.put("__REQUESTDIGEST", requestDigest);
+				postMethodParams.put("__VIEWSTATE", viewstate);
+				
+				return pageHtml;
+			} else {
+				return null;
+			}
+		} catch (Exception e) {
+			System.err.println("#### GREŠKA ZA: " + postPageURL + " ####");
+			e.printStackTrace();			
+			return null;
+		}
+	}
+	
+	@Override
+	public void write (String data) {
+		
+		pProc.addData(8, Utils.joinStringFromArray(findAllInString(data, productPattern), ","));
+		
+		pProc.processPatterns(data, writter);
+	}
+	
+}
+
+

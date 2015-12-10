@@ -1,0 +1,9 @@
+CaseType=CRI
+CourtID=
+CourtLinkCaseNo=
+DefendantAccusedRespondent=
+PlaintiffInformantApplicant=
+filter=
+group=
+pageSize=20
+sort=CourtLinkCaseNo-desc

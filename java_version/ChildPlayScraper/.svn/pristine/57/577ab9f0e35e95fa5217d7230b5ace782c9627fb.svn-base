@@ -1,0 +1,340 @@
+package bots;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.zip.GZIPInputStream;
+
+import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.HttpException;
+import org.apache.commons.httpclient.HttpStatus;
+import org.apache.commons.httpclient.cookie.CookiePolicy;
+import org.apache.commons.httpclient.methods.GetMethod;
+import org.apache.commons.httpclient.methods.PostMethod;
+import org.apache.commons.httpclient.params.HttpMethodParams;
+
+import util.Files;
+import util.PatternProcessor;
+import util.Sha1Hash;
+import util.Writter;
+import master.Master;
+
+public class EcrmContacts extends Master {
+
+	
+
+	private Pattern viewstatePattern;
+	private ArrayList<String[]> viewStates;
+	private Pattern pageNumParPattern;
+	private Pattern viewstategeneratorPattenr;
+	private String viewstategen;
+	private Pattern personIdPattern;
+	private ArrayList<String[]> personIds;
+	private ArrayList<String> linkDetailPage;
+	private String detailLink;
+	private String detailHtml;
+	private Pattern posPattern;
+
+
+	public EcrmContacts(String [] args) {
+		
+		if (args != null && args.length > 0) {
+			firstPageNumber = Integer.parseInt(args[0]);
+		} else {
+			firstPageNumber = 2;
+		}
+		
+		
+		pageIncrement = 1;
+		
+		viewstatePattern = Pattern.compile("name=\"__VIEWSTATE\\d*\" id=\"(.+?)\" value=\"(.+?)\"");
+		viewstategeneratorPattenr = Pattern.compile("id=\"__VIEWSTATEGENERATOR\" value=\"(.+?)\"");
+		personIdPattern = Pattern.compile("name=\"(uxSearchResults\\$rptSearchResultsListingView\\$ctl\\d+\\$hidPersonID)\".+?value=\"(.+?)\"");
+		detailsPagePattern = Pattern.compile("<a href=\"/Contacts/ContactDetails.aspx\\?PersonID=(.+?)\"");
+		paginationPattern = Pattern.compile("onclick=\"\">Next");
+		posPattern = Pattern.compile("<div class=\"floatleft\" style=\"width:200px; overflow:hidden;\"><i style='color:#999;'>");
+		
+		pProc = new PatternProcessor();
+		writter = new Writter("ecrm.csv");
+		writter.writeLine("Company Name,Contact Name,Phone,Email,Designation");
+		
+		pProc.addPattern(1, Pattern.compile("<div class=\"rip_spacer\">.+?<div class=\"full_orange-ribbon-container\">\\s+<a.+?div>\\s*(.+?)<", Pattern.DOTALL));
+		pProc.addPattern(2, Pattern.compile("<div class=\"prep_container\">\\s+.+?<div class=\"full_orange-ribbon-container\">\\s+.+?div>(.+?)<", Pattern.DOTALL));
+		pProc.addPattern(3, Pattern.compile("<div class=\"floatleft\">Phone:\\s*(.+?)<"));
+		pProc.addPattern(4, Pattern.compile("<a id=\"lnkEmail\" href=\"mailto:(.+?)\""));
+		pProc.addPattern(5, Pattern.compile("<div class=\"floatleft\" style=\"width:200px; overflow:hidden;\">(.+?)<"));
+		
+		pProc.addReplacement(5, "<.+?>", "");
+				
+		postPageURL = "http://www.marketgate.com/Contacts/ContactSearch.aspx";		
+		baseURL = "http://www.marketgate.com/Contacts/ContactDetails.aspx?PersonID=";
+		
+		personIds = new ArrayList<>();
+		viewStates = new ArrayList<>();
+		linkDetailPage = new ArrayList<>();
+			
+	}
+	
+	public void run() {
+		
+		try {
+			
+			httpClient = new HttpClient();
+						
+			PostMethod post = new PostMethod("http://www.marketgate.com/Marketgate/LogOn.aspx?nextpage=%2fContacts%2fContactSearch.aspx");
+						
+			String pageHtml = fetchPageContent("http://www.marketgate.com/Marketgate/LogOn.aspx?nextpage=%2fContacts%2fContactSearch.aspx");
+			
+			String viewstate = findInString(pageHtml, Pattern.compile("id=\"__VIEWSTATE\" value=\"(.+?)\""));
+			String viewStateGenerator = findInString(pageHtml, Pattern.compile("id=\"__VIEWSTATEGENERATOR\" value=\"(.+?)\""));
+				
+			post.setFollowRedirects(false);
+		//	post.setParameter("txtUserID", "ZacheryKalatsky");
+		//	post.setParameter("txtPassword", "Kal876");
+			post.setParameter("txtUserID", "PhilGreen1");
+			post.setParameter("txtPassword", "Gre942");
+			post.setParameter("btnLogin", "Enter+Site");
+			post.setParameter("__VIEWSTATE", viewstate);
+			post.setParameter("__VIEWSTATEGENERATOR", viewStateGenerator);
+			post.setParameter("uxHeader$_hidSPAMCheck", "1");
+					
+			post.setRequestHeader("Host", "www.marketgate.com");
+			post.setRequestHeader("Referer", "http://www.marketgate.com/Marketgate/LogOn.aspx?nextpage=%2fContacts%2fContactSearch.aspx");
+						
+			httpClient.executeMethod(post);
+			
+			GetMethod get = new GetMethod("http://www.marketgate.com/Contacts/ContactSearch.aspx");
+			httpClient.executeMethod(get);
+			
+			BufferedReader in = new BufferedReader(new InputStreamReader(get.getResponseBodyAsStream()));
+			StringBuilder sb = new StringBuilder();
+			String line = "";
+			
+			while ((line = in.readLine()) != null) {
+				sb.append(line).append("\n");
+			}
+			
+			in.close();
+			
+			pageHtml = sb.toString();
+						
+			post = new PostMethod("http://www.marketgate.com/Contacts/ContactSearch.aspx");
+			
+			viewstate = findInString(pageHtml, Pattern.compile("id=\"__VIEWSTATE\" value=\"(.+?)\""));
+			String viewstate1 = findInString(pageHtml, Pattern.compile("id=\"__VIEWSTATE1\" value=\"(.+?)\""));
+			String viewstate2 = findInString(pageHtml, Pattern.compile("id=\"__VIEWSTATE2\" value=\"(.+?)\""));
+			String viewstate3 = findInString(pageHtml, Pattern.compile("id=\"__VIEWSTATE3\" value=\"(.+?)\""));
+			
+			post.setParameter("__VIEWSTATE", viewstate);
+			post.setParameter("__VIEWSTATE1", viewstate1);
+			post.setParameter("__VIEWSTATE2", viewstate2);
+			post.setParameter("__VIEWSTATE3", viewstate3);
+			post.setParameter("__VIEWSTATEFIELDCOUNT", "4");
+			post.setParameter("__VIEWSTATEGENERATOR", "69AC633B");
+			post.setParameter("btnQuickSearch", "Search");
+			
+			httpClient.executeMethod(post);
+			
+			String html = post.getResponseBodyAsString();
+		
+			postMethodParams = new HashMap<String, String>();
+			
+			getParameters(html);
+			
+			//System.out.println(html);
+			
+			processPage(html);
+			
+			ArrayList<String> props = Files.loadListFromFile("ecrm_props.txt");
+			for (String prop : props) {
+				String parts [] = prop.split("=");
+				postMethodParams.put(parts[0], "");
+			}
+						
+			pageNumberParam = "uxSearchResults$uxResultPager$hidPageNo";
+									
+			postMethodProcessing();
+			
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+				
+	}
+	
+	private void processPage(String html) {
+		
+	//	System.out.println(html);
+		
+		linkDetailPage = findAllInString(html, detailsPagePattern);
+		
+		for(String linkDetail : linkDetailPage) {
+			
+			detailLink = baseURL + linkDetail;
+			
+			System.out.println("\tProcessing page " + detailLink);
+			
+			detailHtml = fetchPageContent(detailLink);
+			
+			//System.out.println(detailHtml);
+			
+			write(detailHtml);
+		}
+						
+	}
+
+	private void getParameters(String pageHtml) {
+		
+		viewStates = findAllGroupsInString(pageHtml, viewstatePattern);
+		
+		for(String[] viewState : viewStates) {
+			
+			postMethodParams.put(viewState[0], viewState[1]);
+		}
+		
+		viewstategen = findInString(pageHtml, viewstategeneratorPattenr);
+		
+		postMethodParams.put("__VIEWSTATEFIELDCOUNT", Integer.toString(viewStates.size()));
+		postMethodParams.put("__VIEWSTATEGENERATOR", viewstategen);
+		postMethodParams.put("uxSearchResults$ddlPageSize", "50");
+		postMethodParams.put("uxSearchResults$ddlOrderBy", "company_nm, last_nm, first_nm");
+		
+		personIds = findAllGroupsInString(pageHtml, personIdPattern);
+		
+		for(String[] personId : personIds) {
+						
+			postMethodParams.put(personId[0], personId[1]);
+		}
+		
+	}
+
+	
+	public static void main(String[] args) {
+		
+		new EcrmContacts(args).run();
+		
+	}
+	
+	public void write (String data) {
+		
+		pProc.processPatterns(data, writter);
+			
+	}
+	
+	protected void postMethodProcessing() {
+		paginationURL = null;
+		detailsPageURL = null;
+		String pageHtml = null;
+		String carHtml = null;
+
+
+		Matcher paginationMatcher;
+		Matcher urlMatcher;
+
+
+		mainLoop: for (int i = firstPageNumber; i <= lastPageNumber; i += pageIncrement) {
+			postMethodParams.put(pageNumberParam, pageNumberValuePartOne + i + pageNumberValuePartTwo);
+			pageHtml = getHtmlByPost();	
+			
+			if (pageHtml == null) {
+				i -= pageIncrement;
+				sleep(5000);
+				System.out.println("Retrying page " + (i+1));
+				continue;
+			}
+			
+			getParameters(pageHtml);
+			
+			//System.out.println(pageHtml);
+			
+			if (pageHtml != null) {
+				System.out.println("-Pagination page: " + i);
+
+				urlMatcher = detailsPagePattern.matcher(pageHtml);			
+				while (urlMatcher.find()) {
+//					if ((applicationMode == ApplicationMode.Online) && ((carCount % 1) == 0)) {
+//						updateLogOnline();
+//					}
+
+					detailsPageURL = urlMatcher.group(1);
+					//System.out.println(detailsPageURL);
+					if (!detailsPageURL.startsWith("http:")) {
+						detailsPageURL = baseURL + detailsPageURL;
+						
+					}
+
+					System.out.println("\tProcessing page " + detailsPageURL);
+					carHtml = fetchPageContent(detailsPageURL);
+
+					if (carHtml != null) {
+						write(carHtml);
+						recordCount++;
+						newRecordsCount++;
+					}
+					
+					sleep(requestDelay);
+				}
+				paginationMatcher = paginationPattern.matcher(pageHtml);
+				if (!paginationMatcher.find()) {					
+						break;
+					
+				}
+			} 
+		}
+	}
+	
+	protected String getHtmlByPost() {
+		if (httpClient == null) {
+			httpClient = new HttpClient();
+		}
+		BufferedReader br;
+		StringBuffer html = new StringBuffer();
+		String temp;
+		PostMethod method = new PostMethod(postPageURL);
+		HttpMethodParams params = new HttpMethodParams();
+
+	//	params.setSoTimeout(60000);
+	//	params.setCookiePolicy(CookiePolicy.BROWSER_COMPATIBILITY);
+
+//		if (!firefoxMask) {
+//			params.setParameter(HttpMethodParams.USER_AGENT, "Ooyyo/1.0 (Used and new cars search engine; http://www.ooyyo.com/en/static/content/5/about-us/index.html; contacts@ooyyo.com)");
+//		} else {
+//			params.setParameter(HttpMethodParams.USER_AGENT, "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/34.0.1847.131 Safari/537.36");
+//		}
+
+	//	method.setParams(params);
+
+		for (String param : postMethodParams.keySet()) {
+			method.addParameter(param, postMethodParams.get(param));
+		}
+		
+		method.addRequestHeader("Host", "www.marketgate.com");
+		method.addRequestHeader("Referer", "http://www.marketgate.com/Contacts/ContactSearch.aspx");
+		method.addRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:34.0) Gecko/20100101 Firefox/34.0");
+
+		try {
+			int statusCode = httpClient.executeMethod(method);
+			if (statusCode == HttpStatus.SC_OK) {
+				br = new BufferedReader(new InputStreamReader(method.getResponseBodyAsStream(), charset));
+				while ((temp = br.readLine()) != null) {
+					html.append(temp).append("\n");
+				}
+
+				br.close();
+				return html.toString();
+			} else {
+				return null;
+			}
+		} catch (Exception e) {
+			System.err.println("#### GREŠKA ZA: " + postPageURL + " ####");
+			e.printStackTrace();			
+			return null;
+		}
+	}
+
+
+}

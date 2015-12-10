@@ -1,0 +1,2770 @@
+package bots;
+
+import java.awt.image.CropImageFilter;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.zip.GZIPInputStream;
+
+import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.HttpException;
+import org.apache.commons.httpclient.HttpMethod;
+import org.apache.commons.httpclient.methods.GetMethod;
+import org.apache.commons.lang.StringEscapeUtils;
+import org.unbescape.html.HtmlEscape;
+
+import util.PatternProcessor;
+import util.Sha1Hash;
+import util.Utils;
+import util.Writter;
+import master.Master;
+import util.Files;
+
+public class EfaucetsNew2 extends Master {
+
+	
+	private Pattern urlCategoryPattern;
+	private String html;
+	private Pattern subCategoriesWrapPattern;
+	private Pattern subCategoryUrlNamePattern;
+	private String subCategoryWraper;
+	private ArrayList<String[]> subCatURLNames;
+	private String tekst;
+	private ArrayList<String[]> listaUrlCategories;
+	private Pattern finishWrapPattern;
+	private Pattern finishSelectedPattern;
+	private Pattern finishesPattern;
+	private String finishWraper;
+	private String finishSelected;
+	private ArrayList<String> finishes;
+	private Pattern productDescriptionWraperPattern;
+	private Pattern productDescPattern;
+	private String descWraper;
+	private ArrayList<String> descList;
+	private Pattern imageNamePattern;
+	private Pattern imageLinkPattern;
+	private Pattern noImagePattern;
+	private String noImage;
+	private int finishId;
+	private Pattern productDescWraperPattern;
+	private String ulDescWraper;
+	private Pattern pdfWraperPattern;
+	private String pdfWraper;
+	private Pattern noPdfsPattern;
+	private String noPdf;
+	private Pattern specPdfPattern;
+	private Pattern installPdfPattern;
+	private Pattern diagramPdfPattern;
+	private String specPdf;
+	private String installPdf;
+	private String diagramPdf;
+	private String imeSlike;
+	private Pattern noFinishWraperPattern;
+	private Pattern pageNotFoundPattern;
+	private Pattern hostPattern;
+	private String finishWraper2;
+	private String finishSelected2;
+	private String linkSlike;
+	private Pattern specPdfNamePattern;
+	private Pattern installPdfNamePattern;
+	private Pattern diagramPdfNamePattern;
+	private Pattern pdfNamePattern;
+	private String imePdfa;
+	private Pattern numberPattern;
+	private ArrayList<String> list;
+	private String[] parts;
+	private ArrayList<String> brojevi;
+	private int imgNumber;
+	private ArrayList<String> listaUrlSubCategories;
+	private String[] parts2;
+	private ArrayList<String> list2;
+	private int pdfNumberSpec;
+	private int pdfNumberInstall;
+	private int pdfNumberDiagram;
+	private ArrayList<String> brojevi1;
+	private HashMap<String, ArrayList<String>> mapaSubCategoryNumbers;
+	private ArrayList<String> brojevi2;
+	private ArrayList<String> listSubCategoryNumbers;
+	private Pattern recommendedAccessoriesPattern;
+	private Pattern availableAccessoriesPattern;
+	private Pattern skusPattern;
+	private String recAccWrapper;
+	private ArrayList<String> skus;
+	private String avaAccWrapper;
+	private Pattern warrantyPattern;
+	private String warrantyPdf;
+	private Pattern brandNamePattern;
+	private Pattern itemNumberPattern;
+	private String itemNumber;
+	private String brandName;
+	private Pattern pageNotFoundPattern2;
+	private HttpClient client;
+	private GetMethod getCart;
+	private Pattern yourPricePattern;
+	private String yourPrice;
+	private Pattern frequentlyBoughtWrapperPattern;
+	private Pattern mayWeSuggestWrapperPattern;
+	private Pattern skusPattern2;
+	private String frequently;
+	private ArrayList<String> skus2;
+	private String mayWeSuggest;
+	private Pattern coordinatingWrapperPattern;
+	private Pattern skusPattern3;
+	private String coordinatingWrapper;
+	private ArrayList<String> skus3;
+	private ArrayList<String> brandList;
+	private HashMap<String, ArrayList<String>> brandMap;
+	private String[] brandParts;
+	private ArrayList<String> numbers;
+	private String brData;
+	private ArrayList<String> numberList;
+	private Pattern productNamePattern;
+	private String productName;
+	private String nameOfProduct;
+	private Pattern stainlessSteelPattern;
+	private Pattern enameledCastIronPattern;
+	private Pattern fireclayPattern;
+	private String stainlessSteel;
+	private String enameledCastIron;
+	private String fireclay;
+	private Pattern acrylicPattern;
+	private String acrylic;
+	private String brData2;
+	private String brData3;
+	private String brData1;
+	private Pattern mediaRichImagesPattern;
+	private Pattern allImagesPattern;
+	private String mediaRichUrl;
+	private Pattern imageIdPattern;
+	private String imageId;
+	private Pattern checkIdPattern;
+	private String checkId;
+	private Pattern imageLinkPattern2;
+	private HttpClient mediaClient;
+	private HashMap<String, String> imageMap;
+	private Pattern idToPutToMapPattern;
+	private String idToPutInMap;
+	private Pattern allImagesPattern2;
+	private ArrayList<String[]> imageUrls;
+	private HttpClient clientImage;
+	private String checkImageHtml;
+	private Pattern checkImagePattern;
+	private boolean bioOvde;
+	private Pattern imageLinkPattern3;
+	private Pattern imageIdPattern2;
+	private HashMap<String, String> brandNameMap;
+	private HashMap<String, String> categoryNameMap;
+	private String categoryNames;
+	private String brandNames;
+	private String[] categoryArray;
+	private String[] brandArray;
+	private String[] nameNum;
+	private ArrayList<Integer> brojeviBrand;
+	private ArrayList<Integer> brojeviCat;
+	private String categoryDataRow2;
+	private String[] categoryDataArray;
+	private ArrayList<String> skuUpCells;
+	private ArrayList<String> skuLinkRelated;
+	private ArrayList<String> skuLinkCrossCell;
+	private PatternProcessor pProc2;
+	private ArrayList<String> categoryDataList;
+	private List<String> mediaGalleryList;
+	private String finishWraperDuo;
+	private Pattern pricePattern;
+	private String finishPrice;
+	private ArrayList<String> finishList;
+	private ArrayList<Integer> listSizes;
+	private String[] finishArray;
+	private Pattern collectionPattern;
+	private Pattern metaDescPattern;
+	private String collectionName;
+	private String metaDesc;
+	private ArrayList<Integer> brojeviCatNew;
+	private String firstFinishSelected;
+	private double finishPriceDouble;
+	private String productPrice;
+	private double productPriceDouble;
+	private ArrayList<String> urlList;
+	private HashSet<String> urlSet;
+	private ArrayList<String> imageNumList;
+	private String lastNum;
+	private Writter writerUrl;
+	private Writter writerImageNum;
+	private Writter writerUrlProcessed;
+	private ArrayList<String> urlsProcessed;
+	private HashSet<String> urlProcessedSet;
+	private Writter writerHtml;
+	private Pattern htmlCheckPattern;
+	private Pattern yourPricePattern2;
+	private Pattern pricePattern2;
+	private String productPrice2;
+	
+	public EfaucetsNew2() {
+			
+		tekst = Files.loadFileData("inputEfaucets.txt");
+		
+		File fL = new File("efaucetsUrlProcessed.txt");
+		if(!fL.exists()) {
+			writerUrlProcessed = new Writter("efaucetsUrlProcessed.txt");
+		}
+		else {
+			writerUrlProcessed = new Writter("efaucetsUrlProcessed.txt", true);
+		}
+		
+		urlsProcessed = Files.loadListFromFile("efaucetsUrlProcessed.txt");
+		urlProcessedSet = new HashSet<String>();
+		
+		for(String url : urlsProcessed) {
+			url = url.replaceAll("\"", "");
+			urlProcessedSet.add(url);
+		}
+		
+		File fU = new File("efaucetsUrl.txt");
+		if(!fU.exists()) {
+			writerUrl = new Writter("efaucetsUrl.txt");
+		}
+		else {
+			writerUrl = new Writter("efaucetsUrl.txt", true);
+		}
+		
+		File fI = new File("efaucetsImageNum.txt");
+		if(!fI.exists()) {
+			writerImageNum = new Writter("efaucetsImageNum.txt");
+		}
+		else {
+			writerImageNum = new Writter("efaucetsImageNum.txt", true);
+		}
+		
+		File f = new File("efaucets.csv");
+		if(!f.exists()) {
+			writter = new Writter("efaucets.csv", true);
+			writter.writeLine("sku,_store,_attribute_set,_type,_category,_root_category,_product_websites,name,price,description,short_description,weight,status,visibility,tax_class_id,qty,min_qty,use_config_min_qty,is_qty_decimal,backorders,use_config_backorders,min_sale_qty,use_config_min_sale_qty,max_sale_qty,use_config_max_sale_qty,is_in_stock,notify_stock_qty,use_config_notify_stock_qty,manage_stock,use_config_manage_stock,stock_status_changed_auto,use_config_qty_increments,qty_increments,use_config_enable_qty_inc,enable_qty_increments,is_decimal_divided,_links_related_sku,_links_related_position,_links_crosssell_sku,_links_crosssell_position,_links_upsell_sku,_links_upsell_position,image,small_image,thumbnail,_media_attribute_id,_media_image,_media_lable,_media_position,_media_is_disabled,_super_products_sku,_super_attribute_code,_super_attribute_option,_super_attribute_price_corr,color,brand,collection_name,meta_description,spec_sheets,installation_instructions,warranty,parts_diagram");		
+			imgNumber = 1;
+		}
+		else {
+			imageNumList = Files.loadListFromFile("efaucetsImageNum.txt");
+			lastNum = imageNumList.get(imageNumList.size()-1);
+			imgNumber = Integer.parseInt(lastNum) + 1;
+			writter = new Writter("efaucets.csv", true);
+		}
+		
+		urlList = Files.loadListFromFile("efaucetsUrl.txt");
+		urlSet = new HashSet<String>();
+		
+		for(String url : urlList) {
+			url = url.replaceAll("\"", "");
+			urlSet.add(url);
+		}
+		
+		pProc = new PatternProcessor();
+		pProc2 = new PatternProcessor();
+		
+		baseURL = "http://www.efaucets.com";
+		detailsPagePattern = Pattern.compile("<h2 class=\"sli_grid_title sli_h2\">.+?title=\".+?(/detail.asp.+?)\"", Pattern.DOTALL);
+		paginationPattern = Pattern.compile(" title=\"Next\">");
+		
+		urlCategoryPattern = Pattern.compile("href=\"(http.+?)\">(.+?)&nbsp;");
+		subCategoriesWrapPattern = Pattern.compile("Sub-[Cc]ategory:.+?<ul class=\"sli_facets\">(.+?)</ul>", Pattern.DOTALL);
+		subCategoryUrlNamePattern = Pattern.compile("href=\"(http.+?)\">(.+?)&nbsp;<");
+		imageNamePattern = Pattern.compile("<img id=\"prodimage\".+?src=\"/images/.+?/(.+?.jpg)\"", Pattern.DOTALL);
+		finishWrapPattern = Pattern.compile("<select id=\"finishselect\".+?>(.+?)</select>", Pattern.DOTALL); 
+		finishSelectedPattern = Pattern.compile("<option.+?selected.*?>(.+?)<"); //7 Finish
+		//finishesPattern = Pattern.compile("<option value=\"(\\s*.+?)\"\\s*>");
+		finishesPattern = Pattern.compile("<option value=\"(\\s*.+?)\"");
+		productDescriptionWraperPattern = Pattern.compile("<div class=\"productdescription\">.+?Product Description:(.+?)</div>", Pattern.DOTALL);
+		productDescWraperPattern = Pattern.compile("<ul>(.+?)</ul>", Pattern.DOTALL);
+		productDescPattern = Pattern.compile("(<li>.*?</li>)"); //15		
+		//imageNamePattern = Pattern.compile("<div id=\"prodname\".+?h1>(.+?)<", Pattern.DOTALL); //10	
+		imageLinkPattern = Pattern.compile("a rel=(?:\"|')thumbnail(?:\"|')\\s*.+? href=\"(/?images.+?large/.+?\\.(?:jpg|JPG|jpeg|JPEG))");
+		imageLinkPattern2 = Pattern.compile("id=(?:\"|')prodimage(?:\"|').+?src=\"(/images.+?\\.(?:jpg|JPG|jpeg|JPEG))\"");
+		imageLinkPattern3 = Pattern.compile("id=(?:\"|')prodimage(?:\"|').+?src=\"(.+?\\.(?:jpg|JPG|jpeg|JPEG))");
+		pdfWraperPattern = Pattern.compile("<h3 class=\"headingbg\">Product Specs & Diagrams:</h3>(.+?)</div>", Pattern.DOTALL);
+		noPdfsPattern = Pattern.compile("(Specifications are unavailable)");
+		specPdfPattern = Pattern.compile("</a>.+?<a.+?href=\"(.+?)\">Specification Sheet<");
+		installPdfPattern = Pattern.compile("</a>.+?<a.+?href=\"(.+?)\">Installation Instructions<");
+		diagramPdfPattern = Pattern.compile("</a>.+?<a.+?href=\"(.+?)\">Parts Diagram<");
+		numberPattern = Pattern.compile("(\\d+)");	
+		pdfNamePattern = Pattern.compile("pdf/(.+?.pdf)");	
+		noFinishWraperPattern = Pattern.compile("<strong>Finish:</strong>(.+?)</div>");
+		pageNotFoundPattern = Pattern.compile("(<title>Page Not Found</title>)");
+		pageNotFoundPattern2 = Pattern.compile("(<TITLE>.+?Page Not Found.+?</TITLE>)");
+		hostPattern = Pattern.compile("(http://.+?)/");
+		recommendedAccessoriesPattern = Pattern.compile("<li>Recommended Accessories:(.+?)</li>");
+		availableAccessoriesPattern = Pattern.compile("<li>Available Accessories:(.+?)</li>");	
+		skusPattern = Pattern.compile("([A-Z0-9-]{2,})");
+		brandNamePattern = Pattern.compile("<div id=\"manufcrumb\"><a.+?>(.+?)<");
+		itemNumberPattern = Pattern.compile("<div id=\"prodcrumb\">(.+?)<");
+		yourPricePattern = Pattern.compile("div id=\"yourcost\".+?Your Price:.+?\">(.+?)<");
+		yourPricePattern2 = Pattern.compile("<div id=\"listprice\">(.+?)</div>");
+		frequentlyBoughtWrapperPattern = Pattern.compile("<h3>Frequently Bought(.+?)</section>", Pattern.DOTALL);
+		mayWeSuggestWrapperPattern = Pattern.compile("<h3>May We Suggest(.+?)</section>", Pattern.DOTALL);
+		coordinatingWrapperPattern = Pattern.compile("<h3.+?>Coordinating(.+?)</section>", Pattern.DOTALL);
+		skusPattern2 = Pattern.compile("span class='prodid'>(.+?)<");
+		skusPattern3 = Pattern.compile("prodid:'(.+?)'");
+		productNamePattern = Pattern.compile("<div id=\"prodname\".+?h1>(.+?)<", Pattern.DOTALL);
+		stainlessSteelPattern = Pattern.compile("(Stainless Steel)");
+		enameledCastIronPattern = Pattern.compile("(Enameled Cast Iron)");
+		fireclayPattern = Pattern.compile("(Fireclay)");
+		acrylicPattern = Pattern.compile("(Acrylic)");
+		mediaRichImagesPattern = Pattern.compile("(/MediaRich/HTML/zoom_sonic/zoom.asp\\?.+?)'");
+		allImagesPattern = Pattern.compile("onClick=\"window.+?\\('(.+?)'.+?src=\"(.+?\\.(?:jpg|JPG|jpeg|JPEG|png|PNG))");
+		imageIdPattern = Pattern.compile("images/.+?/(.+?)\\.(?:jpg|JPG|jpeg|JPEG|png|PNG)");
+		imageIdPattern2 = Pattern.compile("eimprovement.+?/mgen/.+?/(.+?)\\.jpg");
+		idToPutToMapPattern = Pattern.compile("img=.+?/(.+?)\\.(?:jpg|JPG|jpeg|JPEG|png|PNG)");
+		checkImagePattern = Pattern.compile("(File Not Found)");
+		warrantyPattern = Pattern.compile("<a name=\"warranty\">.+?a.+?href=\"(.+?)\"", Pattern.DOTALL); //warranty
+		pricePattern = Pattern.compile("div id=\"yourcost\".+?Your Price:.+?\">(.+?)<");
+		pricePattern2 = Pattern.compile("<div id=\"listprice\">(.+?)</div>");
+		collectionPattern = Pattern.compile("<div id=\"prodfinish\">.+?Collection:.+?a.+?>(.*?)<");
+		metaDescPattern = Pattern.compile("<div class=\"productdescription\">.+?h3 class=\"headingbg\">.+?strong>(.+?)<", Pattern.DOTALL);
+		htmlCheckPattern = Pattern.compile("(<!DOCTYPE html>)");
+		
+		//pProc.addPattern(8, Pattern.compile("<div id=\"prodname\".+?h1>(.+?)<", Pattern.DOTALL)); // name
+		//pProc.addPattern(111, Pattern.compile("<div id=\"prodname\".+?h1>(.+?)<", Pattern.DOTALL)); // name
+		//pProc.addPattern(9, Pattern.compile("<div id=\"prodname\".+?h1>(.+?)<", Pattern.DOTALL)); //name
+		
+		//pProc.addPattern(56, Pattern.compile("<div id=\"manufcrumb\"><a.+?>(.+?)<")); // brand name
+		pProc.addPattern(1, Pattern.compile("<div id=\"prodcrumb\">(.+?)<")); // item number
+		//pProc.addPattern(58, Pattern.compile("<div class=\"productdescription\">.+?h3 class=\"headingbg\">.+?strong>(.+?)<", Pattern.DOTALL)); //meta desc 10		
+		//pProc.addPattern(57, Pattern.compile("<div id=\"prodfinish\">.+?Collection:.+?a.+?>(.*?)<")); //collection name
+		//pProc.addPattern(33, Pattern.compile("div id=\"prodlist\".+?Retail Price:.+?\">(.+?)<")); //Retail price
+		//pProc.addPattern(9, Pattern.compile("div id=\"yourcost\".+?Your Price:.+?\">(.+?)<"));
+						
+		finishId = 1;
+		pdfNumberSpec = 1;
+		pdfNumberInstall = 1;
+		pdfNumberDiagram = 1;
+		
+		
+		File f1 = new File("imagesEfaucets/");
+		if(!f1.exists()) {
+			f1.mkdirs();
+		}
+		
+		File f2 = new File("diagramPdfs/");
+		if(!f2.exists()) {
+			f2.mkdirs();
+		}
+		
+		File f3 = new File("installationPdfs/");
+		if(!f3.exists()) {
+			f3.mkdirs();
+		}
+		
+		File f4 = new File("specificationPdfs/");
+		if(!f4.exists()) {
+			f4.mkdirs();
+		}
+		
+		File f5 = new File("warrantyPdfs/");
+		if(!f5.exists()) {
+			f5.mkdirs();
+		}
+			
+		pProc.addReplacement(8, "&nbsp;", " ");
+		pProc.addReplacement(9, "&nbsp;", " ");
+		pProc.addReplacement(8, "&amp;", "&");
+		pProc.addReplacement(9, "&amp;", "&");
+		
+		
+	}
+	
+	public void run() {
+			
+		brandNameMap = new HashMap<String, String>();
+		categoryNameMap = new HashMap<String, String>();		
+		categoryNames = Files.loadFileData("categoryNames.txt");
+		brandNames = Files.loadFileData("brandNames.txt");		
+		categoryArray = categoryNames.split("\\$");
+		brandArray = brandNames.split("\\$");		
+		
+		for(int i = 0; i < categoryArray.length; i++) {
+			nameNum = categoryArray[i].split("~");
+			categoryNameMap.put(nameNum[1], nameNum[0]);
+		}
+		
+		for(int i = 0; i < brandArray.length; i++) {
+			nameNum = brandArray[i].split("~");
+			brandNameMap.put(nameNum[1], nameNum[0]);
+		}
+		
+		brandMap = new HashMap<String, ArrayList<String>>();
+		brandList = Files.loadListFromFile("inputEfaucetsBrands.txt");
+		
+		for(String brand : brandList) {
+			
+			brandParts = brand.split("~");
+			
+			numbers = findAllInString(brandParts[1], numberPattern);
+			
+			brandMap.put(brandParts[0], numbers);
+		}
+		
+		nameOfProduct = "";
+		
+		list = Files.loadListFromFile("efaucetsListCategories.txt");
+				
+		for(String s : list) {
+			
+			parts = s.split("~");
+				
+			firstPageNumber = 0;
+			pageIncrement = 300;
+			lastPageNumber = Integer.parseInt(parts[2]);
+			
+			incrementPartOneURL = parts[0];
+							
+			brojevi = findAllInString(parts[1], numberPattern);
+			
+			brojeviCat = new ArrayList<Integer>(brojevi.size());
+		
+			for(String br : brojevi) {
+				brojeviCat.add(Integer.valueOf(br));
+			}
+			
+			Collections.sort(brojeviCat);
+			
+			typeOneProcessing();
+						
+		}
+		
+		/*listaUrlCategories = findAllGroupsInString(tekst, urlCategoryPattern);
+		
+		listaUrlSubCategories = Files.loadListFromFile("finalCategories.txt");
+		
+		for(String[] url : listaUrlCategories) {
+				
+			html = fetchPageContent(url[0]);
+			
+			url[1] = url[1].replaceAll("\\s+", "");
+			url[1] = url[1].toLowerCase();
+			url[1] = url[1].replaceAll("[&-]", "");
+			
+			subCategoryWraper = findInString(html, subCategoriesWrapPattern);
+			
+			subCatURLNames = findAllGroupsInString(subCategoryWraper, subCategoryUrlNamePattern);		
+				
+			for(String[] subCatURLName : subCatURLNames) {
+				
+				subCatURLName[1] = subCatURLName[1].replaceAll("\\s+", "");
+				subCatURLName[1] = subCatURLName[1].toLowerCase();
+				subCatURLName[1] = subCatURLName[1].replaceAll("[&-]", "");
+				
+				for(String s : listaUrlSubCategories) {
+					
+					parts = s.split("~");
+					
+					if(parts.length == 3) {
+						
+						String category = s.substring(0, s.indexOf("~"));
+						
+						nameOfProduct = "";
+						
+						if(category.equals("Kitchen Sinks")) {
+							nameOfProduct = "Kitchen Sinks";
+						}
+												
+						if(category.equals("Bar & Prep Sinks")) {
+							nameOfProduct = "Bar & Prep Sinks";
+						}						
+						
+						if(category.equals("Laundry&Utility Sinks")) {
+							nameOfProduct = "Laundry&Utility Sinks";
+						}
+						
+						
+						category = category.replaceAll("\\s+", "");
+						category = category.toLowerCase();
+						category = category.replaceAll("[&-]", "");
+						String subCategory = s.substring(s.indexOf("~")+1, s.lastIndexOf("~"));
+						String numbers = s.substring(s.indexOf("~"));
+						
+						if(url[1].equals(category)) {
+
+							if(subCatURLName[1].equals(subCategory)) {
+								
+								brojevi2 = findAllInString(numbers, numberPattern);
+								
+								brojeviCat = new ArrayList<Integer>(brojevi2.size());
+							
+								for(String br : brojevi2) {
+									brojeviCat.add(Integer.valueOf(br));
+								}
+								
+								Collections.sort(brojeviCat);
+														
+								firstPageNumber = 0;
+								pageIncrement = 300;
+
+								incrementPartOneURL = "http://faucets.efaucets.com/search?p=Q&srid=S12-USESD02&lbc=efaucets&ts=custom&w=*&uid=37253007&cnt=300&method=and&af=ct2%3a" + subCatURLName[1] + "%20ct1%3a" + url[1]  + "%20type%3aproducts&isort=globalpop&view=grid&review=1&srt=";
+								
+								typeOneProcessing();
+							}
+						}
+					}
+					else {
+						String category = s.substring(0, s.indexOf("~"));
+						//String subCategory = s.substring(0, s.indexOf("~"));
+						String numbers = s.substring(s.indexOf("~"));
+						
+						if(url[1].equals(category)) {
+		
+								brojevi2 = findAllInString(numbers, numberPattern);
+								
+								brojeviCat = new ArrayList<Integer>(brojevi2.size());
+								
+								for(String br : brojevi2) {
+									brojeviCat.add(Integer.valueOf(br));
+								}
+								
+								Collections.sort(brojeviCat);
+								
+								firstPageNumber = 0;
+								pageIncrement = 300;
+
+								incrementPartOneURL = "http://faucets.efaucets.com/search?p=Q&srid=S12-USESD02&lbc=efaucets&ts=custom&w=*&uid=37253007&cnt=300&method=and&af=ct2%3a" + subCatURLName[1] + "%20ct1%3a" + url[1]  + "%20type%3aproducts&isort=globalpop&view=grid&review=1&srt=";
+								
+								typeOneProcessing();
+							
+						}
+					}
+
+				}
+	
+			}	
+		}*/
+	}	
+	
+	public void write(String data, String url, int finishID) {
+		
+		//always the same
+		
+		data = HtmlEscape.unescapeHtml(data);
+
+		pProc.addData(2, "");
+		pProc.addData(3, "Polished Chrome");
+		pProc.addData(6, "Polished Chrome");
+		pProc.addData(7, "base");
+		pProc.addData(12, "1");
+		pProc.addData(13, "1");
+		pProc.addData(14, "1");
+		pProc.addData(15, "2");
+		pProc.addData(16, "1");
+		pProc.addData(17, "0");
+		pProc.addData(18, "1");
+		pProc.addData(19, "0");
+		pProc.addData(20, "0");
+		pProc.addData(21, "1");
+		pProc.addData(22, "1");
+		pProc.addData(23, "1");
+		pProc.addData(24, "0");
+		pProc.addData(25, "1");
+		pProc.addData(26, "1");
+		pProc.addData(27, "0");
+		pProc.addData(28, "1");
+		pProc.addData(29, "0");
+		pProc.addData(30, "1");
+		pProc.addData(31, "0");
+		pProc.addData(32, "1");
+		pProc.addData(33, "0");
+		pProc.addData(34, "1");
+		pProc.addData(35, "0");
+		pProc.addData(36, "0");
+		pProc.addData(48, "");
+		pProc.addData(50, "0");
+		
+		
+		
+		for(int i = 39; i <= 76; i++) {
+			pProc.addData(i, "");
+		}
+		
+		itemNumber = findInString(data, itemNumberPattern);
+		brandName = findInString(data, brandNamePattern);
+		productName = findInString(data, productNamePattern);
+		collectionName = findInString(data, collectionPattern);
+		metaDesc = findInString(data, metaDescPattern);
+		productPrice = findInString(data, pricePattern);
+		
+		if(productPrice.equals("")) {
+			productPrice = findInString(data, pricePattern2);
+		}
+		
+		pProc.addData(9, productPrice);
+		pProc.addData(56, brandName);
+		pProc.addData(57, collectionName);
+		pProc.addData(58, metaDesc);
+		
+		brData2 = "";
+		
+		brojeviCatNew = new ArrayList<Integer>();
+		brojeviCatNew.addAll(brojeviCat);
+		
+		if(nameOfProduct.equals("Kitchen Sinks")) {
+			
+			stainlessSteel = findInString(productName, stainlessSteelPattern);
+			enameledCastIron = findInString(productName, enameledCastIronPattern);
+			fireclay = findInString(productName, fireclayPattern);
+		
+			if(!stainlessSteel.equals("")) {
+				brojeviCatNew.add(112);
+			}
+			
+			if(!enameledCastIron.equals("")) {
+				brojeviCatNew.add(111);
+			}
+			
+			if(!fireclay.equals("")) {
+				brojeviCatNew.add(113);
+			}	
+		}
+				
+		if(nameOfProduct.equals("Bar & Prep Sinks")) {
+					
+			stainlessSteel = findInString(productName, stainlessSteelPattern);
+			enameledCastIron = findInString(productName, enameledCastIronPattern);
+			acrylic = findInString(productName, acrylicPattern);
+					
+			if(!stainlessSteel.equals("")) {
+				brojeviCatNew.add(121);
+			}
+			
+			if(!enameledCastIron.equals("")) {
+				brojeviCatNew.add(120);
+			}	
+			
+			if(!acrylic.equals("")) {
+				brojeviCatNew.add(122);
+			}		
+		}
+
+		if(nameOfProduct.equals("Laundry&Utility Sinks")) {
+			
+			stainlessSteel = findInString(productName, stainlessSteelPattern);
+			enameledCastIron = findInString(productName, enameledCastIronPattern);
+			
+			if(!stainlessSteel.equals("")) {
+				brojeviCatNew.add(127);
+			}
+			
+			if(!enameledCastIron.equals("")) {
+				brojeviCatNew.add(126);
+			}		
+		}
+		
+		Collections.sort(brojeviCatNew);
+		
+		brData3 = "";
+		brojeviBrand = new ArrayList<Integer>();
+		
+		if(brandMap.containsKey(brandName)) {
+			
+			numberList = brandMap.get(brandName);
+			
+			brojeviBrand = new ArrayList<Integer>(numberList.size());
+			
+			for(String br : numberList) {
+				brojeviBrand.add(Integer.valueOf(br));
+			}
+			
+			Collections.sort(brojeviBrand);
+			
+			/*for(String number : numberList) {
+				brData3 += "," + number;
+			}
+			
+			brData3 = skloniSaKraja(brData3);	*/	
+		}
+		
+		String categoryData = "";
+		String categoryDataRow = "";
+		String category = "";
+		int catDepth = 1;
+		
+		for(Integer br : brojeviCatNew) {
+			if(categoryNameMap.containsKey(br.toString())) {
+				if(catDepth == 4) {
+					category = categoryNameMap.get(br.toString());
+					if(!category.startsWith("Shop")) {
+						categoryDataRow2 = categoryDataRow2.substring(0, categoryDataRow2.lastIndexOf("/") + 1);
+						categoryDataRow2 += category + "/";
+						categoryDataRow2 = skloniSaKraja(categoryDataRow2, "/");
+						categoryData += categoryDataRow2 + "~";
+					}
+				}
+				else {
+					category = categoryNameMap.get(br.toString());
+					categoryDataRow += categoryNameMap.get(br.toString()) + "/";
+					categoryDataRow2 = skloniSaKraja(categoryDataRow, "/");
+					categoryData += categoryDataRow2 + "~";
+					catDepth++;
+				}
+			}		
+		}
+		
+		categoryDataRow = "";
+		
+		if(!brojeviBrand.isEmpty()) {
+			for(Integer br : brojeviBrand) {
+				if(brandNameMap.containsKey(br.toString())) {
+					categoryDataRow += brandNameMap.get(br.toString()) + "/";
+					categoryDataRow2 = skloniSaKraja(categoryDataRow, "/");
+					categoryData += categoryDataRow2 + "~";
+				}
+			}
+		}
+		
+		categoryData = skloniSaKraja(categoryData, "~");
+		
+		categoryDataArray = categoryData.split("~");
+		
+		categoryDataList = new ArrayList<String>();
+		
+		for(int i = 0; i < categoryDataArray.length; i++) {
+			categoryDataList.add(categoryDataArray[i]);
+		}
+		
+		//pProc.addData(5, brData + brData2 + brData3);
+		
+		descWraper = findInString(data, productDescriptionWraperPattern);
+		
+		//cross-sell and related products
+		
+		recAccWrapper = findInString(descWraper, recommendedAccessoriesPattern);
+		avaAccWrapper = findInString(descWraper, availableAccessoriesPattern);
+		
+		if(recAccWrapper.equals("") && avaAccWrapper.equals("")) {
+			client = new HttpClient();		
+			yourPrice = findInString(data, yourPricePattern);
+			
+			if(yourPrice.equals("")) {
+				yourPrice = findInString(data, yourPricePattern2);
+			}
+			getCart = new GetMethod("http://www.efaucets.com/detail-configure.asp?Product_ID=" + itemNumber.replaceAll(" ", "+") + "%20&Qty=1&priceeach=" + yourPrice.replaceAll(" ", "+"));
+			
+			getCart.setRequestHeader("Host", "www.efaucets.com");
+			getCart.setRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:38.0) Gecko/20100101 Firefox/38.0");
+			
+			try {
+				client.executeMethod(getCart);
+			} catch (HttpException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} catch (Exception e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			
+			String html = getData(getCart, false);
+			
+			frequently = findInString(html, frequentlyBoughtWrapperPattern);
+			mayWeSuggest = findInString(html, mayWeSuggestWrapperPattern);
+			
+			if(!frequently.equals("")) {
+				skuLinkRelated = findAllInString(frequently, skusPattern2);
+				
+				/*String skusData2 = "";
+				
+				for(String sku : skus2) {
+					skusData2 += sku + ",";
+				}
+				
+				skusData2 = skloniSaKraja(skusData2, ",");
+				pProc.addData(123, skusData2);*/
+			}
+			
+			if(!mayWeSuggest.equals("")) {
+				skuLinkCrossCell = findAllInString(mayWeSuggest, skusPattern2);
+				
+				/*String skusData2 = "";
+				
+				for(String sku : skus2) {
+					skusData2 += sku + ",";
+				}
+				
+				skusData2 = skloniSaKraja(skusData2, ",");
+				pProc.addData(124, skusData2);*/
+			}
+			
+		}
+		else {
+			if(!recAccWrapper.equals("")) {
+				skuLinkRelated = findAllInString(recAccWrapper, skusPattern);
+				
+				/*String skuData = "";
+				for(String s : skus) {
+					skuData += s + ",";
+				}
+				
+				skuData = skloniSaKraja(skuData, ",");
+				pProc.addData(123, skuData);*/
+			}
+			else {
+				//dodavanje u korpu svaki put
+				client = new HttpClient();		
+				yourPrice = findInString(data, yourPricePattern);
+				
+				if(yourPrice.equals("")) {
+					yourPrice = findInString(data, yourPricePattern2);
+				}
+				getCart = new GetMethod("http://www.efaucets.com/detail-configure.asp?Product_ID=" + itemNumber.replaceAll(" ", "+") + "%20&Qty=1&priceeach=" + yourPrice.replaceAll(" ", "+"));
+				
+				getCart.setRequestHeader("Host", "www.efaucets.com");
+				getCart.setRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:38.0) Gecko/20100101 Firefox/38.0");
+				
+				try {
+					client.executeMethod(getCart);
+				} catch (HttpException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				} catch (Exception e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+				
+				String html = getData(getCart, false);
+				
+				frequently = findInString(html, frequentlyBoughtWrapperPattern);
+				mayWeSuggest = findInString(html, mayWeSuggestWrapperPattern);
+				
+				if(!frequently.equals("")) {
+					skuLinkRelated = findAllInString(frequently, skusPattern2);
+					
+					/*String skusData2 = "";
+					
+					for(String sku : skus2) {
+						skusData2 += sku + ",";
+					}
+					
+					skusData2 = skloniSaKraja(skusData2, ",");
+					pProc.addData(123, skusData2);*/
+				}
+				
+				if(!mayWeSuggest.equals("")) {
+					skuLinkCrossCell = findAllInString(mayWeSuggest, skusPattern2);
+					
+					/*String skusData2 = "";
+					
+					for(String sku : skus2) {
+						skusData2 += sku + ",";
+					}
+					
+					skusData2 = skloniSaKraja(skusData2, ",");
+					pProc.addData(124, skusData2);*/
+				}
+				
+			}
+			
+			if(!avaAccWrapper.equals("")) {
+				skuLinkCrossCell = findAllInString(avaAccWrapper, skusPattern);
+				
+				/*String skuData = "";
+				for(String s : skus) {
+					skuData += s + ",";
+				}
+				
+				skuData = skloniSaKraja(skuData, ",");
+				pProc.addData(124, skuData);*/
+			}
+			else {
+				//dodavanje u korpu svaki put
+				client = new HttpClient();		
+				yourPrice = findInString(data, yourPricePattern);
+				
+				if(yourPrice.equals("")) {
+					yourPrice = findInString(data, yourPricePattern2);
+				}
+				getCart = new GetMethod("http://www.efaucets.com/detail-configure.asp?Product_ID=" + itemNumber.replaceAll(" ", "+") + "%20&Qty=1&priceeach=" + yourPrice.replaceAll(" ", "+"));
+				
+				getCart.setRequestHeader("Host", "www.efaucets.com");
+				getCart.setRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:38.0) Gecko/20100101 Firefox/38.0");
+				
+				try {
+					client.executeMethod(getCart);
+				} catch (HttpException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				} catch (Exception e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+				
+				String html = getData(getCart, false);
+				
+				frequently = findInString(html, frequentlyBoughtWrapperPattern);
+				mayWeSuggest = findInString(html, mayWeSuggestWrapperPattern);
+				
+				if(!frequently.equals("")) {
+					skuLinkRelated = findAllInString(frequently, skusPattern2);
+					
+					/*String skusData2 = "";
+					
+					for(String sku : skus2) {
+						skusData2 += sku + ",";
+					}
+					
+					skusData2 = skloniSaKraja(skusData2, ",");
+					pProc.addData(123, skusData2);*/
+				}
+				
+				if(!mayWeSuggest.equals("")) {
+					skuLinkCrossCell = findAllInString(mayWeSuggest, skusPattern2);
+					
+					/*String skusData2 = "";
+					
+					for(String sku : skus2) {
+						skusData2 += sku + ",";
+					}
+					
+					skusData2 = skloniSaKraja(skusData2, ",");
+					pProc.addData(124, skusData2);*/
+				}
+			}	
+		}
+		
+		//up-sells
+		
+		coordinatingWrapper = findInString(data, coordinatingWrapperPattern);
+		
+		if(!coordinatingWrapper.equals("")) {
+			skuUpCells = findAllInString(coordinatingWrapper, skusPattern3);
+			
+			/*String skusData3 = "";
+			
+			for(String sku : skus3) {
+				skusData3 += sku + ",";
+			}
+			
+			skusData3 = skloniSaKraja(skusData3, ",");
+			pProc.addData(122, skusData3);*/
+		}
+		
+		ulDescWraper = findInString(descWraper, productDescWraperPattern);
+		
+		String descriptionData = "";
+		String shortDescData = "";
+		
+		if(!ulDescWraper.equals("")) {
+			
+			descriptionData = "<ul>";
+			
+			descList = findAllInString(ulDescWraper, productDescPattern);
+			
+			for(String desc : descList) {
+				
+				descriptionData += desc;
+			}
+			
+			descriptionData += "</ul>";
+	
+			//System.out.println(descriptionData);
+			
+			if(descList.size() > 1) {
+				for(int i = 0; i < 2; i++) {
+					shortDescData += descList.get(i) + " ";
+				}
+			}
+			if(descList.size() == 1) {
+				shortDescData += descList.get(0) + " ";
+			}
+			
+			if(!descList.isEmpty()) {
+				String nameData = descList.get(0).replaceAll("<.+?>", "");
+				pProc.addData(8, nameData);
+			}
+			else {
+				pProc.addData(8, productName);
+			}
+			
+			if(!descriptionData.equals("")) {
+				descriptionData = descriptionData.trim();
+				
+				shortDescData = shortDescData.trim();
+				shortDescData = shortDescData.replaceAll("<.+?>", "");
+				pProc.addData(10, descriptionData);		
+				pProc.addData(11, shortDescData);	
+				
+			}
+			else {
+				pProc.addData(10, "");
+				pProc.addData(8, "");
+			}
+					
+		}
+		else {
+			pProc.addData(10, "");
+			pProc.addData(11, "");
+			pProc.addData(8, productName);
+		}
+		
+		//za slike sve 	
+
+		linkSlike = findInString(data, imageLinkPattern);
+		
+		if(linkSlike.equals("")) {
+			linkSlike = findInString(data, imageLinkPattern2);
+		}
+		
+		if(linkSlike.equals("")) {
+			linkSlike = findInString(data, imageLinkPattern3);
+		}
+		
+		linkSlike = linkSlike.replaceAll("&nbsp;", " ");
+		
+		if(linkSlike.startsWith("/images")) {
+			linkSlike = "http://www.efaucets.com" + linkSlike;
+		}
+		
+		if(linkSlike.startsWith("images")) {
+			linkSlike = "http://www.efaucets.com/" + linkSlike;
+		}
+		
+		linkSlike = linkSlike.replaceAll("\\s+", "+");
+		
+//		if(itemNumber.equals("5985")) {
+//			System.out.println("Ovde");
+//		}
+		
+		imageId = findInString(linkSlike, imageIdPattern);
+		imageId = imageId.toLowerCase();
+		
+		if(imageId.equals("")) {
+			imageId = findInString(linkSlike, imageIdPattern2);
+			imageId = imageId.toLowerCase();
+		}
+
+		mediaRichUrl = findInString(data, mediaRichImagesPattern);
+		
+		imageMap = new HashMap<String, String>();
+		mediaGalleryList = new ArrayList<String>();
+		
+		if(!mediaRichUrl.equals("")) {
+			
+			GetMethod getImage = new GetMethod("http://www.efaucets.com" + mediaRichUrl.replaceAll("\\s+", "+"));
+			getImage.setRequestHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+			getImage.setRequestHeader("Accept-Encoding", "gzip, deflate");
+			getImage.setRequestHeader("Accept-Language", "en-US,en;q=0.5");
+			getImage.setRequestHeader("Connection", "keep-alive");
+			getImage.setRequestHeader("Host", "www.efaucets.com");
+			getImage.setRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:38.0) Gecko/20100101 Firefox/38.0");
+			
+			try {
+				httpClient.executeMethod(getImage);
+			} catch (HttpException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} catch (Exception e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+						
+			String htmlImage = getData(getImage, true);
+			imageUrls = findAllGroupsInString(htmlImage, allImagesPattern);
+			bioOvde = false;
+			
+			if(!imageUrls.isEmpty()) {
+				
+				String mediaGallery = "";
+				
+				for(String[] imageUrl : imageUrls) {
+							
+					checkIdPattern = Pattern.compile("(/" + imageId + ")\\.jpg");
+					
+					imageUrl[1] = imageUrl[1].toLowerCase();
+					checkId = findInString(imageUrl[1], checkIdPattern);
+					
+					idToPutInMap = findInString(imageUrl[0], idToPutToMapPattern);
+					idToPutInMap = idToPutInMap.toLowerCase();
+					
+					try {	
+						checkImageHtml = fetchPageContent(imageUrl[1].replaceAll("\\s+", "+"));
+						if(checkImageHtml == null) {
+							pProc.addData(47, "");				
+						}
+						else {
+							if(findInString(checkImageHtml, checkImagePattern).equals("")) {						
+								if(!imageMap.containsKey(idToPutInMap)) {
+									saveImage(imageUrl[1].replaceAll("\\s+", "+"), "imagesEfaucets/" + "image" + imgNumber + ".jpg");
+									writerImageNum.writeLine(imgNumber + "");
+									mediaGallery += "/image" + imgNumber + ".jpg" + ",";
+									imageMap.put(idToPutInMap, "image" + imgNumber + ".jpg");
+										
+									if(!checkId.equals("")) {
+										pProc.addData(43, "/" + "image" + imgNumber + ".jpg");
+										pProc.addData(44, "/" + "image" + imgNumber + ".jpg");
+										pProc.addData(45, "/" + "image" + imgNumber + ".jpg");
+									}
+									imgNumber++;
+								}
+												
+							}
+						}		
+					} catch (Exception e2) {					
+						pProc.addData(47, "");								
+					}
+				}
+				
+				if(imageMap.isEmpty()) {
+					idToPutInMap = findInString(linkSlike, imageIdPattern);
+					idToPutInMap = idToPutInMap.toLowerCase();
+					try {
+						saveImage(linkSlike, "imagesEfaucets/" + "image" + imgNumber + ".jpg");
+						writerImageNum.writeLine(imgNumber + "");
+						imageMap.put(idToPutInMap, "image" + imgNumber + ".jpg");
+						pProc.addData(43, "/" + "image" + imgNumber + ".jpg");
+						pProc.addData(44, "/" + "image" + imgNumber + ".jpg");
+						pProc.addData(45, "/" + "image" + imgNumber + ".jpg");
+						imgNumber++;
+					} catch (Exception e) {						
+						e.printStackTrace();
+					}				
+				}
+				
+				if(!imageMap.containsKey(imageId)) {
+					try {
+						saveImage(linkSlike, "imagesEfaucets/" + "image" + imgNumber + ".jpg");
+						writerImageNum.writeLine(imgNumber + "");
+						imageMap.put(imageId, "image" + imgNumber + ".jpg");
+						mediaGallery += "/image" + imgNumber + ".jpg" + ",";
+						pProc.addData(43, "/" + "image" + imgNumber + ".jpg");
+						pProc.addData(44, "/" + "image" + imgNumber + ".jpg");
+						pProc.addData(45, "/" + "image" + imgNumber + ".jpg");
+						imgNumber++;
+					} catch (Exception e) {
+						pProc.addData(43, "");
+						pProc.addData(44, "");
+						pProc.addData(45, "");
+						pProc.addData(47, "");
+					}					
+				}
+				
+				if(!mediaGallery.equals("") && imageMap.size() > 1) {
+					mediaGallery = skloniSaKraja(mediaGallery, ",");
+					mediaGalleryList = Arrays.asList(mediaGallery.split(","));
+					//pProc.addData(47, mediaGallery);
+				}
+				else {
+					pProc.addData(47, "");	
+				}
+				
+				
+				
+			}
+			else {					
+				try {						
+					saveImage(linkSlike, "imagesEfaucets/" + "image" + imgNumber + ".jpg");
+					writerImageNum.writeLine(imgNumber + "");
+					imageMap.put(imageId, "image" + imgNumber + ".jpg");
+					pProc.addData(43, "/" + "image" + imgNumber + ".jpg");
+					pProc.addData(44, "/" + "image" + imgNumber + ".jpg");
+					pProc.addData(45, "/" + "image" + imgNumber + ".jpg");
+					pProc.addData(47, "");
+					imgNumber++;
+					
+				} catch (Exception e2) {
+					pProc.addData(43, "");
+					pProc.addData(44, "");
+					pProc.addData(45, "");
+					pProc.addData(47, "");
+											
+				}
+			}	
+		}
+		else {		
+			try {			
+				saveImage(linkSlike, "imagesEfaucets/" + "image" + imgNumber + ".jpg");
+				writerImageNum.writeLine(imgNumber + "");
+				pProc.addData(43, "/" + "image" + imgNumber + ".jpg");
+				pProc.addData(44, "/" + "image" + imgNumber + ".jpg");
+				pProc.addData(45, "/" + "image" + imgNumber + ".jpg");
+				pProc.addData(47, "");
+				imgNumber++;			
+			} catch (Exception e2) {
+				pProc.addData(43, "");
+				pProc.addData(44, "");
+				pProc.addData(45, "");
+				pProc.addData(47, "");										
+			}
+			
+		}
+		
+		//pdfovi
+		
+		pdfWraper = findInString(data, pdfWraperPattern);
+		
+		noPdf = findInString(pdfWraper, noPdfsPattern);
+		
+		//ako ima
+		if(noPdf.equals("")) {
+			
+			specPdf = findInString(pdfWraper, specPdfPattern);
+			installPdf = findInString(pdfWraper, installPdfPattern);
+			diagramPdf = findInString(pdfWraper, diagramPdfPattern);
+			
+			if(!specPdf.equals("")) {			
+				if(savePDF(specPdf, "specificationPdfs/" + brandName + itemNumber + "specification.pdf", url) == 0) {
+					pProc.addData(59, "<a href=\"/media/pdfs/" + brandName + itemNumber + "specification.pdf\" target=\"_blank\">Spec Sheets</a>");
+				}
+				else {
+					pProc.addData(59, "");
+				}
+				
+			}
+			else {
+				pProc.addData(59, "");
+			}
+			
+			if(!installPdf.equals("")) {
+				if(savePDF(installPdf, "installationPdfs/" + brandName + itemNumber + "installation.pdf", url) == 0) {
+					pProc.addData(60, "<a href=\"/media/pdfs/" + brandName + itemNumber + "installation.pdf\" target=\"_blank\">Installation Instructions</a>");
+				}
+				else {
+					pProc.addData(60, "");
+				}
+				
+			}
+			else {
+				pProc.addData(60, "");
+			}
+			
+			if(!diagramPdf.equals("")) {			
+				if(savePDF(diagramPdf, "diagramPdfs/" + brandName + itemNumber + "diagram.pdf", url) == 0) {
+					pProc.addData(62,  "<a href=\"/media/pdfs/" + brandName + itemNumber + "diagram.pdf\" target=\"_blank\">Parts Diagram</a>");
+				}
+				else {
+					pProc.addData(62, "");
+				}
+				
+			}
+			else {
+				pProc.addData(62, "");
+			}
+			
+		}
+		else {
+			pProc.addData(59, "");
+			pProc.addData(60, "");
+			pProc.addData(62, "");
+		}
+		
+		warrantyPdf = findInString(data, warrantyPattern);
+		if(savePDF(warrantyPdf, "warrantyPdfs/" + brandName + itemNumber + "warranty.pdf", url) == 0) {
+			pProc.addData(61, "<a href=\"/media/pdfs/" + brandName + itemNumber + "warranty.pdf\" target=\"_blank\">Warranty</a>");
+		}
+		else {
+			pProc.addData(61, "");
+		}
+		
+		/*pProc.addData(59, "");
+		pProc.addData(60, "");
+		pProc.addData(62, "");
+		pProc.addData(61, "");*/
+		
+		//da se uzme samo cena i finish i sku
+		
+		finishWraper = findInString(data, finishWrapPattern);
+		finishList = new ArrayList<String>();
+		finishes = new  ArrayList<String>();
+		//firstFinishSelected = "";
+		
+		if(!finishWraper.equals("")) {
+			
+			//firstFinishSelected = findInString(finishWraper, finishSelectedPattern);
+			
+			/*if(!finishSelected.equals("")) {
+				//pProc.addData(3, finishSelected);
+				pProc.addData(55, finishSelected);
+			}
+			else {
+				//pProc.addData(3, "");
+				pProc.addData(55, "");
+			}*/			
+						
+			finishes = findAllInString(finishWraper, finishesPattern);
+				
+			if(!finishes.isEmpty()) {
+				
+				finishSelected = findInString(finishWraper, finishSelectedPattern);
+				//String price = findInString(data, pricePattern);
+				String itemNum = findInString(data, itemNumberPattern);
+				
+				finishes.add(itemNum);
+				
+				int counter = 0;
+				for( int i=0; i<itemNum.length(); i++ ) {
+				    if( itemNum.charAt(i) == '-' ) {
+				        counter++;
+				    } 
+				}
+				if(counter == 2) {			
+					itemNum = itemNum.substring(0, itemNum.lastIndexOf("-"));		
+				}
+				else {
+					int indeksCrte = itemNum.indexOf("-");
+					if(indeksCrte != -1) {
+						itemNum = itemNum.substring(0, itemNum.indexOf("-"));
+					}
+					else {
+						char c = itemNum.charAt(0);
+						if(!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'))) {
+							itemNum = itemNum.replaceAll("\\D+", "");
+						}
+									
+					}	
+				}
+						
+								
+				pProc.addData(4, "configurable");
+				pProc.addData(55, "");
+				pProc.addData(14, "4");
+				pProc.addData(1, itemNum);
+				
+				for(String finish : finishes) {
+					
+					finish = finish.replaceAll("\\s+", "+");
+		
+					String s = url.substring(url.indexOf("Product_Id="));
+					
+					String urlFinish = url.replaceAll(s, "");
+					
+					String finishUrl = urlFinish + "Product_Id=" + finish;
+					finishUrl = finishUrl.replaceAll("\\s+", "+");
+					
+					int j = 1;
+					
+					while(j <= 5) {
+						
+						String finishHtml = fetchPageContent(finishUrl);							
+						
+						if(finishHtml == null){
+							j++;
+							sleep(1000);
+						}
+						else {
+							String checkHtml = findInString(finishHtml, htmlCheckPattern);
+							if(!checkHtml.equals("")) {
+
+								finishWraperDuo = findInString(finishHtml, finishWrapPattern);
+								finishSelected = findInString(finishWraperDuo, finishSelectedPattern);
+								finishPrice = findInString(finishHtml, pricePattern);
+								
+								if(finishPrice.equals("")) {
+									finishPrice = findInString(finishHtml, pricePattern2);
+								}
+								
+								if(!finishPrice.equals("")) {
+									finishPrice = finishPrice.replaceAll("\\$", "");
+									productPrice = productPrice.replaceAll("\\$", "");
+									finishPrice = finishPrice.replaceAll(",", "");
+									productPrice = productPrice.replaceAll(",", "");
+									
+									finishPriceDouble = Double.parseDouble(finishPrice);
+									productPriceDouble = Double.parseDouble(productPrice);
+									
+									if(finishPriceDouble > productPriceDouble) {
+										double result = finishPriceDouble - productPriceDouble;
+										finishPrice = "$" + String.format("%.2f", result);
+									}
+									else {
+										double result = productPriceDouble - finishPriceDouble;
+										finishPrice = "$" + String.format("%.2f", result);
+									}
+									
+									String skuColorPrice = finish + "~" + finishSelected + "~" + finishPrice;
+									finishList.add(skuColorPrice);
+									break;
+								}
+								else {
+									String skuColorPrice = finish + "~" + finishSelected + "~" + 0;
+									finishList.add(skuColorPrice);
+									break;
+								}
+							}
+							else {
+								sleep(1000);
+								break;
+							}
+						}
+					}
+										
+				}
+			}						
+		}
+		else {
+			
+			String itemNum = findInString(data, itemNumberPattern);
+			
+			int counter = 0;
+			for( int i=0; i<itemNum.length(); i++ ) {
+			    if( itemNum.charAt(i) == '-' ) {
+			        counter++;
+			    } 
+			}
+			if(counter == 2) {			
+				itemNum = itemNum.substring(0, itemNum.lastIndexOf("-"));		
+			}
+			else {
+				int indeksCrte = itemNum.indexOf("-");
+				if(indeksCrte != -1) {
+					itemNum = itemNum.substring(0, itemNum.indexOf("-"));
+				}
+				else {
+					char c = itemNum.charAt(0);
+					if(!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'))) {
+						itemNum = itemNum.replaceAll("\\D+", "");
+					}
+								
+				}	
+			}
+			
+			String finish = findInString(data, noFinishWraperPattern);
+			/*String finishPrice = findInString(data, pricePattern);
+			String sku = findInString(data, itemNumberPattern);
+
+			String skuColorPrice = sku + "~" + finish + "~" + finishPrice;
+			finishList.add(skuColorPrice);*/
+			
+			if(!finish.equals("")) {
+			//	pProc.addData(3, finish);
+				pProc.addData(55, finish);
+			}
+			else {
+				//pProc.addData(3, "");
+				pProc.addData(55, "");
+			}
+			
+			pProc.addData(4, "simple");
+			pProc.addData(14, "1");
+			pProc.addData(1, itemNum);
+			
+		}
+		
+		int relPos = 1;
+		int crossPos = 1;
+		int upPos = 1;
+		int imagePos = 1;
+		
+		listSizes = new ArrayList<Integer>();
+		
+		try {
+			listSizes.add(categoryDataList.size());
+		} catch (Exception e) {
+			
+		}
+		
+		try {
+			listSizes.add(skuLinkCrossCell.size());
+		} catch (Exception e) {
+			
+		}
+		
+		try {
+			listSizes.add(skuLinkRelated.size());
+		} catch (Exception e) {
+			
+		}
+		
+		try {
+			listSizes.add(skuUpCells.size());
+		} catch (Exception e) {
+			
+		}
+		
+		try {
+			listSizes.add(mediaGalleryList.size());
+		} catch (Exception e) {
+			
+		}
+		
+		try {
+			listSizes.add(finishList.size());
+		} catch (Exception e) {
+			
+		}
+			
+		int max = Collections.max(listSizes);
+		
+		//za prvi red pProc
+		
+		pProc.addData(5, categoryDataList.get(0));
+		pProc.addData(6, "Polished Chrome");
+		
+		try {
+			pProc.addData(37, skuLinkRelated.get(0));
+			pProc.addData(38, relPos++ + "");
+		} catch (Exception e) {
+			pProc.addData(37, "");
+			pProc.addData(38, "");
+		}
+		
+		try {
+			pProc.addData(39, skuLinkCrossCell.get(0));
+			pProc.addData(40, crossPos++ + "");
+		} catch (Exception e) {
+			pProc.addData(39, "");
+			pProc.addData(40, "");
+		}
+		
+		try {
+			pProc.addData(41, skuUpCells.get(0));
+			pProc.addData(42, upPos++ + "");
+		} catch (Exception e) {
+			pProc.addData(41, "");
+			pProc.addData(42, "");
+		}
+		
+		try {
+			pProc.addData(47, mediaGalleryList.get(0));
+			pProc.addData(49, imagePos++ + "");
+		} catch (Exception e) {
+			pProc.addData(47, "");
+			pProc.addData(49, "");
+		}
+		
+		try {
+			String finishDataFirst = finishList.get(0);
+			finishArray = finishDataFirst.split("~");
+			if(finishArray[1].equals("Polished Chrome")) {
+				if(!finishArray[0].contains("PC")) {
+					pProc.addData(51, finishArray[0] + "PC");
+				}
+				else {
+					pProc.addData(51, finishArray[0]);
+				}
+			}
+			else {
+				pProc.addData(51, finishArray[0]);
+			}			
+			pProc.addData(52, "color");
+			pProc.addData(53, finishArray[1]);
+			pProc.addData(54, finishArray[2]);
+		} catch (Exception e) {
+			pProc.addData(51, "");
+			pProc.addData(52, "");
+			pProc.addData(53, "");
+			pProc.addData(54, "");
+		}
+		
+		pProc.addData(46, "88");
+		pProc.addData(50, "0");
+		
+		pProc.processPatterns(data, writter);
+		
+		for(int i = 1; i < 5; i++) {
+			pProc2.addData(i, "");
+		}
+		
+		for(int i = 7; i < 37; i++) {
+			pProc2.addData(i, "");
+		}
+		
+		for(int i = 43; i < 46; i++) {
+			pProc2.addData(i, "");
+		}
+		
+		pProc2.addData(46, "88");
+		
+		for(int i = 43; i < 46; i++) {
+			pProc2.addData(i, "");
+		}
+		
+		pProc2.addData(48, "");
+		pProc2.addData(50, "0");
+		
+		for(int i = 55; i < 63; i++) {
+			pProc2.addData(i, "");
+		}
+		
+		for(int i = 1; i < max; i++) {
+			
+			try{
+				pProc2.addData(5, categoryDataList.get(i));
+				pProc2.addData(6, "Polished Chrome");
+			} catch (Exception e){
+				pProc2.addData(5, "");
+				pProc2.addData(6, "");
+			}
+			
+			
+			try {
+				pProc2.addData(37, skuLinkRelated.get(i));
+				pProc2.addData(38, relPos++ + "");
+			} catch (Exception e) {
+				pProc2.addData(37, "");
+				pProc2.addData(38, "");
+			}
+			
+			try {
+				pProc2.addData(39, skuLinkCrossCell.get(i));
+				pProc2.addData(40, crossPos++ + "");
+			} catch (Exception e) {
+				pProc2.addData(39, "");
+				pProc2.addData(40, "");
+			}
+			
+			try {
+				pProc2.addData(41, skuUpCells.get(i));
+				pProc2.addData(42, upPos++ + "");
+			} catch (Exception e) {
+				pProc2.addData(41, "");
+				pProc2.addData(42, "");
+			}
+			
+			try {
+				pProc2.addData(47, mediaGalleryList.get(i));
+				pProc2.addData(49, imagePos++ + "");
+			} catch (Exception e) {
+				pProc2.addData(47, "");
+				pProc2.addData(49, "");
+			}
+			
+			try {
+				String finishDataFirst = finishList.get(i);
+				finishArray = finishDataFirst.split("~");
+				if(finishArray[1].equals("Polished Chrome")) {
+					if(!finishArray[0].contains("PC")) {
+						pProc2.addData(51, finishArray[0] + "PC");
+					}
+					else {
+						pProc2.addData(51, finishArray[0]);
+					}
+				}
+				else {
+					pProc2.addData(51, finishArray[0]);
+				}
+				pProc2.addData(52, "color");
+				pProc2.addData(53, finishArray[1]);
+				pProc2.addData(54, finishArray[2]);
+			} catch (Exception e) {
+				pProc2.addData(51, "");
+				pProc2.addData(52, "");
+				pProc2.addData(53, "");
+				pProc2.addData(54, "");
+			}
+			
+			pProc2.processPatterns(data, writter);
+			
+		}
+				
+		//da se udje za svaki prozivod(finish) posebno da se obradi
+		
+		finishWraper = findInString(data, finishWrapPattern);
+		
+		//finishSelected = findInString(finishWraper, finishSelectedPattern);
+		
+		//if(!finishWraper.equals("")) {
+					
+			//finishes = findAllInString(finishWraper, finishesPattern);
+						
+			if(!finishes.isEmpty()) {
+								
+				for(String finish : finishes) {
+					
+					finish = finish.replaceAll("\\s+", "+");
+					
+					//System.out.println(url);
+		
+					String s = url.substring(url.indexOf("Product_Id="));
+					
+					String urlFinish = url.replaceAll(s, "");
+					
+					String finishUrl = urlFinish + "Product_Id=" + finish;
+					finishUrl = finishUrl.replaceAll("\\s+", "+");
+					
+					int j = 1;
+					
+					while(j <= 5) {
+						
+						String finishHtml = fetchPageContent(finishUrl);
+						
+						if(finishHtml == null){
+							j++;
+							sleep(1000);
+						}
+						else {
+							String checkHtml = findInString(finishHtml, htmlCheckPattern);
+							if(!checkHtml.equals("")) {
+								write(finishHtml, finishID, finishUrl);
+								sleep(1000);
+								break;
+							}
+							else {
+								sleep(1000);
+								break;
+							}
+						}
+					}
+				}
+				
+			}	
+			
+			if(!urlProcessedSet.contains(url)) {
+				urlProcessedSet.add(url);
+				writerUrlProcessed.writeLine(url);
+			}
+			
+		//}
+			
+	}
+	
+	private String skloniSaKraja(String niska, String karakter) {
+		
+		niska = niska.trim();
+		
+		int duzinaNiske = niska.length();
+		
+		int pozKaraktera = niska.lastIndexOf(karakter);
+		
+		if(duzinaNiske-1 == pozKaraktera) {
+			niska = niska.substring(0, niska.length()-1);
+		}
+		
+		return niska;
+	}
+
+	public void write(String data, int finishID, String url) {
+		
+		if(!urlSet.contains(url)) {
+			urlSet.add(url);
+			writerUrl.writeLine(url);
+		}
+		
+		data = HtmlEscape.unescapeHtml(data);
+
+		descWraper = findInString(data, productDescriptionWraperPattern);
+		
+		itemNumber = findInString(data, itemNumberPattern);
+		brandName = findInString(data, brandNamePattern);
+		productName = findInString(data, productNamePattern);
+		productPrice2 = findInString(data, pricePattern);
+		
+		if(productPrice2.equals("")) {
+			productPrice2 = findInString(data, pricePattern2);
+		}
+		
+		pProc.addData(9, productPrice2);
+		
+		/*if(nameOfProduct.equals("Kitchen Sinks")) {
+			
+			stainlessSteel = findInString(productName, stainlessSteelPattern);
+			enameledCastIron = findInString(productName, enameledCastIronPattern);
+			fireclay = findInString(productName, fireclayPattern);
+			
+			if(!stainlessSteel.equals("")) {
+				brData += "," + "112";
+			}
+			
+			if(!enameledCastIron.equals("")) {
+				brData += "," + "111";
+			}
+			
+			if(!fireclay.equals("")) {
+				brData += "," + "113";
+			}
+		}
+				
+		if(nameOfProduct.equals("Bar & Prep Sinks")) {
+					
+			stainlessSteel = findInString(productName, stainlessSteelPattern);
+			enameledCastIron = findInString(productName, enameledCastIronPattern);
+			acrylic = findInString(productName, acrylicPattern);
+					
+			if(!stainlessSteel.equals("")) {
+				brData += "," + "121";
+			}
+			
+			if(!enameledCastIron.equals("")) {
+				brData += "," + "120";
+			}	
+			
+			if(!acrylic.equals("")) {
+				brData += "," + "122";
+			}
+			
+		}
+
+		if(nameOfProduct.equals("Laundry&Utility Sinks")) {
+			
+			stainlessSteel = findInString(productName, stainlessSteelPattern);
+			enameledCastIron = findInString(productName, enameledCastIronPattern);
+			
+			if(!stainlessSteel.equals("")) {
+				brData += "," + "127";
+			}
+			
+			if(!enameledCastIron.equals("")) {
+				brData += "," + "126";
+			}
+			
+		}
+		
+		if(brandMap.containsKey(brandName)) {
+			
+			numberList = brandMap.get(brandName);
+			
+			for(String number : numberList) {
+				brData += "," + number;
+			}
+			
+			brData = skloniSaKraja(brData);		
+		}*/
+		
+		//pProc.addData(5, brData + brData2 + brData3);
+		
+		//cross-sell and related products
+		
+		skuLinkRelated = new ArrayList<>();
+		skuLinkCrossCell = new ArrayList<>();
+		skuUpCells = new ArrayList<>();
+		
+		recAccWrapper = findInString(descWraper, recommendedAccessoriesPattern);
+		avaAccWrapper = findInString(descWraper, availableAccessoriesPattern);
+		
+		if(recAccWrapper.equals("") && avaAccWrapper.equals("")) {
+			client = new HttpClient();		
+			yourPrice = findInString(data, yourPricePattern);
+			
+			if(yourPrice.equals("")) {
+				yourPrice = findInString(data, yourPricePattern2);
+			}
+			getCart = new GetMethod("http://www.efaucets.com/detail-configure.asp?Product_ID=" + itemNumber.replaceAll(" ", "+") + "%20&Qty=1&priceeach=" + yourPrice.replaceAll(" ", "+"));
+			
+			getCart.setRequestHeader("Host", "www.efaucets.com");
+			getCart.setRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:38.0) Gecko/20100101 Firefox/38.0");
+			
+			try {
+				client.executeMethod(getCart);
+			} catch (HttpException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} catch (Exception e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			
+			String html = getData(getCart, false);
+			
+			frequently = findInString(html, frequentlyBoughtWrapperPattern);
+			mayWeSuggest = findInString(html, mayWeSuggestWrapperPattern);
+			
+			if(!frequently.equals("")) {
+				skuLinkRelated = findAllInString(frequently, skusPattern2);
+				
+				/*String skusData2 = "";
+				
+				for(String sku : skus2) {
+					skusData2 += sku + ",";
+				}
+				
+				skusData2 = skloniSaKraja(skusData2, ",");
+				pProc.addData(123, skusData2);*/
+			}
+			
+			if(!mayWeSuggest.equals("")) {
+				skuLinkCrossCell = findAllInString(mayWeSuggest, skusPattern2);
+				
+				/*String skusData2 = "";
+				
+				for(String sku : skus2) {
+					skusData2 += sku + ",";
+				}
+				
+				skusData2 = skloniSaKraja(skusData2, ",");
+				pProc.addData(124, skusData2);*/
+			}
+			
+		}
+		else {
+			if(!recAccWrapper.equals("")) {
+				skuLinkRelated = findAllInString(recAccWrapper, skusPattern);
+				
+				/*String skuData = "";
+				for(String s : skus) {
+					skuData += s + ",";
+				}
+				
+				skuData = skloniSaKraja(skuData, ",");
+				pProc.addData(123, skuData);*/
+			}
+			else {
+				//dodavanje u korpu svaki put
+				client = new HttpClient();		
+				yourPrice = findInString(data, yourPricePattern);
+				
+				if(yourPrice.equals("")) {
+					yourPrice = findInString(data, yourPricePattern2);
+				}
+				getCart = new GetMethod("http://www.efaucets.com/detail-configure.asp?Product_ID=" + itemNumber.replaceAll(" ", "+") + "%20&Qty=1&priceeach=" + yourPrice.replaceAll(" ", "+"));
+				
+				getCart.setRequestHeader("Host", "www.efaucets.com");
+				getCart.setRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:38.0) Gecko/20100101 Firefox/38.0");
+				
+				try {
+					client.executeMethod(getCart);
+				} catch (HttpException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				} catch (Exception e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+				
+				String html = getData(getCart, false);
+				
+				frequently = findInString(html, frequentlyBoughtWrapperPattern);
+				mayWeSuggest = findInString(html, mayWeSuggestWrapperPattern);
+				
+				if(!frequently.equals("")) {
+					skuLinkRelated = findAllInString(frequently, skusPattern2);
+					
+					/*String skusData2 = "";
+					
+					for(String sku : skus2) {
+						skusData2 += sku + ",";
+					}
+					
+					skusData2 = skloniSaKraja(skusData2, ",");
+					pProc.addData(123, skusData2);*/
+				}
+				
+				if(!mayWeSuggest.equals("")) {
+					skuLinkCrossCell = findAllInString(mayWeSuggest, skusPattern2);
+					
+					/*String skusData2 = "";
+					
+					for(String sku : skus2) {
+						skusData2 += sku + ",";
+					}
+					
+					skusData2 = skloniSaKraja(skusData2, ",");
+					pProc.addData(124, skusData2);*/
+				}
+				
+			}
+			
+			if(!avaAccWrapper.equals("")) {
+				skuLinkCrossCell = findAllInString(avaAccWrapper, skusPattern);
+				
+				/*String skuData = "";
+				for(String s : skus) {
+					skuData += s + ",";
+				}
+				
+				skuData = skloniSaKraja(skuData, ",");
+				pProc.addData(124, skuData);*/
+			}
+			else {
+				//dodavanje u korpu svaki put
+				client = new HttpClient();		
+				yourPrice = findInString(data, yourPricePattern);
+				
+				if(yourPrice.equals("")) {
+					yourPrice = findInString(data, yourPricePattern2);
+				}
+				getCart = new GetMethod("http://www.efaucets.com/detail-configure.asp?Product_ID=" + itemNumber.replaceAll(" ", "+") + "%20&Qty=1&priceeach=" + yourPrice.replaceAll(" ", "+"));
+				
+				getCart.setRequestHeader("Host", "www.efaucets.com");
+				getCart.setRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:38.0) Gecko/20100101 Firefox/38.0");
+				
+				try {
+					client.executeMethod(getCart);
+				} catch (HttpException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				} catch (Exception e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+				
+				String html = getData(getCart, false);
+				
+				frequently = findInString(html, frequentlyBoughtWrapperPattern);
+				mayWeSuggest = findInString(html, mayWeSuggestWrapperPattern);
+				
+				if(!frequently.equals("")) {
+					skuLinkRelated = findAllInString(frequently, skusPattern2);
+					
+					/*String skusData2 = "";
+					
+					for(String sku : skus2) {
+						skusData2 += sku + ",";
+					}
+					
+					skusData2 = skloniSaKraja(skusData2, ",");
+					pProc.addData(123, skusData2);*/
+				}
+				
+				if(!mayWeSuggest.equals("")) {
+					skuLinkCrossCell = findAllInString(mayWeSuggest, skusPattern2);
+					
+					/*String skusData2 = "";
+					
+					for(String sku : skus2) {
+						skusData2 += sku + ",";
+					}
+					
+					skusData2 = skloniSaKraja(skusData2, ",");
+					pProc.addData(124, skusData2);*/
+				}
+			}	
+		}
+		
+		//up-sells
+		
+		coordinatingWrapper = findInString(data, coordinatingWrapperPattern);
+		
+		if(!coordinatingWrapper.equals("")) {
+			skuUpCells = findAllInString(coordinatingWrapper, skusPattern3);
+			
+			/*String skusData3 = "";
+			
+			for(String sku : skus3) {
+				skusData3 += sku + ",";
+			}
+			
+			skusData3 = skloniSaKraja(skusData3, ",");
+			pProc.addData(122, skusData3);*/
+		}
+		ulDescWraper = findInString(descWraper, productDescWraperPattern);
+		
+		String descriptionData = "";
+		String shortDescData = "";
+		
+		if(!ulDescWraper.equals("")) {
+			
+			descriptionData = "<ul>";
+			
+			descList = findAllInString(ulDescWraper, productDescPattern);
+			
+			for(String desc : descList) {
+				
+				descriptionData += desc;
+			}
+			
+			descriptionData += "</ul>";
+			
+			if(descList.size() > 1) {
+				for(int i = 0; i < 2; i++) {
+					shortDescData += descList.get(i) + " ";
+				}
+			}
+			if(descList.size() == 1) {
+				shortDescData += descList.get(0) + " ";
+			}
+			
+			if(!descList.isEmpty()){
+				String nameData = descList.get(0).replaceAll("<.+?>", "");
+				pProc.addData(8, nameData);
+			}
+			else {
+				pProc.addData(8, productName);
+			}
+			
+			if(!descriptionData.equals("")) {
+				descriptionData = descriptionData.trim();
+				
+				shortDescData = shortDescData.trim();
+				shortDescData = shortDescData.replaceAll("<.+?>", "");
+				pProc.addData(10, descriptionData);		
+				pProc.addData(11, shortDescData);	
+				
+			}
+			else {
+				pProc.addData(10, "");
+				pProc.addData(8, "");
+			}
+					
+		}
+		else {
+			pProc.addData(10, "");
+			pProc.addData(11, "");
+			pProc.addData(8, productName);
+		}
+		
+		linkSlike = findInString(data, imageLinkPattern);
+		
+		if(linkSlike.equals("")) {
+			linkSlike = findInString(data, imageLinkPattern2);
+		}
+		
+		if(linkSlike.equals("")) {
+			linkSlike = findInString(data, imageLinkPattern3);
+		}
+		
+		linkSlike = linkSlike.replaceAll("&nbsp;", " ");
+		
+		if(linkSlike.startsWith("/images")) {
+			linkSlike = "http://www.efaucets.com" + linkSlike;
+		}
+		
+		if(linkSlike.startsWith("images")) {
+			linkSlike = "http://www.efaucets.com/" + linkSlike;
+		}
+		
+		linkSlike = linkSlike.replaceAll("\\s+", "+");
+		
+		imageId = findInString(linkSlike, imageIdPattern);
+		imageId = imageId.toLowerCase();
+
+		if(imageId.equals("")) {
+			imageId = findInString(linkSlike, imageIdPattern2);
+			imageId = imageId.toLowerCase();
+		}
+		mediaRichUrl = findInString(data, mediaRichImagesPattern);	
+		
+		if(!mediaRichUrl.equals("")) {
+			
+			if(imageMap.containsKey(imageId) && imageMap.size() == 1) {
+				pProc.addData(43, "");
+				pProc.addData(44, "");
+				pProc.addData(45, "");
+			}
+			else {
+				String imageValue = imageMap.get(imageId);
+			
+				if(imageValue != null) {
+					pProc.addData(43, "/" + imageValue);
+					pProc.addData(44, "");
+					pProc.addData(45, "");
+				}
+				else {
+					
+					if(linkSlike.startsWith("http://images.eimprovement")) {
+						try {
+							saveImage(linkSlike, "imagesEfaucets/" + "image" + imgNumber + ".jpg");
+							writerImageNum.writeLine(imgNumber + "");
+							pProc.addData(43, "/" + "image" + imgNumber + ".jpg");
+							pProc.addData(44, "");
+							pProc.addData(45, "");
+							pProc.addData(47, "");
+							imgNumber++;
+						} catch (Exception e) {
+							pProc.addData(43, "");
+							pProc.addData(44, "");
+							pProc.addData(45, "");
+							pProc.addData(47, "");
+						}					
+					}
+					if(linkSlike.startsWith("http://www.efaucets.com/images")) {
+						try {
+							saveImage(linkSlike, "imagesEfaucets/" + "image" + imgNumber + ".jpg");
+							writerImageNum.writeLine(imgNumber + "");
+							pProc.addData(43, "/" + "image" + imgNumber + ".jpg");
+							pProc.addData(44, "");
+							pProc.addData(45, "");
+							pProc.addData(47, "");
+							imgNumber++;
+						} catch (Exception e) {
+							pProc.addData(43, "");
+							pProc.addData(44, "");
+							pProc.addData(45, "");
+							pProc.addData(47, "");
+						}		
+					}
+					else {
+						pProc.addData(43, "");
+						pProc.addData(44, "");
+						pProc.addData(45, "");
+						pProc.addData(47, "");
+					}				
+				}
+			}
+				
+		}
+		else {		
+			try {	
+				checkImageHtml = fetchPageContent(linkSlike);
+				if(checkImageHtml == null) {
+					pProc.addData(43, "");
+					pProc.addData(44, "");
+					pProc.addData(45, "");
+					pProc.addData(47, "");
+				}
+				else {
+					if(findInString(checkImageHtml, checkImagePattern).equals("")) {
+						saveImage(linkSlike, "imagesEfaucets/" + "image" + imgNumber + ".jpg");
+						writerImageNum.writeLine(imgNumber + "");
+						pProc.addData(43, "/" + "image" + imgNumber + ".jpg");
+						pProc.addData(44, "");
+						pProc.addData(45, "");
+						pProc.addData(47, "");
+						imgNumber++;
+					}
+					else {
+						pProc.addData(43, "");
+						pProc.addData(44, "");
+						pProc.addData(45, "");
+						pProc.addData(47, "");
+					}
+				}				
+			} catch (Exception e2) {
+				pProc.addData(43, "");
+				pProc.addData(44, "");
+				pProc.addData(45, "");
+				pProc.addData(47, "");
+										
+			}
+			
+		}
+		
+		pdfWraper = findInString(data, pdfWraperPattern);
+		
+		noPdf = findInString(pdfWraper, noPdfsPattern);
+		
+		if(noPdf.equals("")) {
+			
+			specPdf = findInString(pdfWraper, specPdfPattern);
+			installPdf = findInString(pdfWraper, installPdfPattern);
+			diagramPdf = findInString(pdfWraper, diagramPdfPattern);
+			
+			if(!specPdf.equals("")) {			
+				if(savePDF(specPdf, "specificationPdfs/" + brandName + itemNumber + "specification.pdf", url) == 0) {
+					pProc.addData(59, "<a href=\"/media/pdfs/" + brandName + itemNumber + "specification.pdf\" target=\"_blank\">Spec Sheets</a>");
+				}
+				else {
+					pProc.addData(59, "");
+				}
+				
+			}
+			else {
+				pProc.addData(59, "");
+			}
+			
+			if(!installPdf.equals("")) {
+				if(savePDF(installPdf, "installationPdfs/" + brandName + itemNumber + "installation.pdf", url) == 0) {
+					pProc.addData(60, "<a href=\"/media/pdfs/" + brandName + itemNumber + "installation.pdf\" target=\"_blank\">Installation Instructions</a>");
+				}
+				else {
+					pProc.addData(60, "");
+				}
+				
+			}
+			else {
+				pProc.addData(60, "");
+			}
+			
+			if(!diagramPdf.equals("")) {			
+				if(savePDF(diagramPdf, "diagramPdfs/" + brandName + itemNumber + "diagram.pdf", url) == 0) {
+					pProc.addData(62,  "<a href=\"/media/pdfs/" + brandName + itemNumber + "diagram.pdf\" target=\"_blank\">Parts Diagram</a>");
+				}
+				else {
+					pProc.addData(62, "");
+				}
+				
+			}
+			else {
+				pProc.addData(62, "");
+			}
+			
+		}
+		else {
+			pProc.addData(59, "");
+			pProc.addData(60, "");
+			pProc.addData(62, "");
+		}
+		
+		warrantyPdf = findInString(data, warrantyPattern);
+		if(savePDF(warrantyPdf, "warrantyPdfs/" + brandName + itemNumber + "warranty.pdf", url) == 0) {
+			pProc.addData(61, "<a href=\"/media/pdfs/" + brandName + itemNumber + "warranty.pdf\" target=\"_blank\">Warranty</a>");
+		}
+		else {
+			pProc.addData(61, "");
+		}
+		
+		/*pProc.addData(59, "");
+		pProc.addData(60, "");
+		pProc.addData(62, "");
+		pProc.addData(61, "");*/
+		
+		finishWraper2 = findInString(data, finishWrapPattern);
+		
+		if(!finishWraper2.equals("")) {
+			
+			pProc.addData(4, "simple");
+			pProc.addData(14, "1");
+			pProc.addData(1, findInString(data, itemNumberPattern));
+			
+			finishSelected2 = findInString(finishWraper2, finishSelectedPattern);
+			
+			if(finishSelected2.equals("Polished Chrome")) {
+				String itemNum = findInString(data, itemNumberPattern);
+				if(!itemNum.contains("PC")) {
+					pProc.addData(1, itemNum + "PC");
+				}
+				else {
+					pProc.addData(1, itemNum);
+				}
+			}
+			
+			if(!finishSelected2.equals("")) {		
+				pProc.addData(55, finishSelected2);
+			}
+			else {
+				pProc.addData(55, "");
+			}
+		}
+		else {
+			
+			pProc.addData(4, "simple");
+			pProc.addData(14, "1");
+			
+			String finish = findInString(data, noFinishWraperPattern);
+			
+			if(!finish.equals("")) {
+				pProc.addData(55, finish);
+			}
+			else {
+				pProc.addData(55, "");
+			}
+		}	
+		
+		int relPos = 1;
+		int crossPos = 1;
+		int upPos = 1;
+		
+		listSizes = new ArrayList<Integer>();
+		
+		try {
+			listSizes.add(categoryDataList.size());
+		} catch (Exception e) {
+			
+		}
+		
+		try {
+			listSizes.add(skuLinkCrossCell.size());
+		} catch (Exception e) {
+			
+		}
+		
+		try {
+			listSizes.add(skuLinkRelated.size());
+		} catch (Exception e) {
+			
+		}
+		
+		try {
+			listSizes.add(skuUpCells.size());
+		} catch (Exception e) {
+			
+		}
+				
+		int max = Collections.max(listSizes);
+		
+		//za prvi red pProc
+		
+		pProc.addData(5, categoryDataList.get(0));
+		pProc.addData(6, "Polished Chrome");
+			
+		try {
+			pProc.addData(37, skuLinkRelated.get(0));
+			pProc.addData(38, relPos++ + "");
+		} catch (Exception e) {
+			pProc.addData(37, "");
+			pProc.addData(38, "");
+		}
+		
+		try {
+			pProc.addData(39, skuLinkCrossCell.get(0));
+			pProc.addData(40, crossPos++ + "");
+		} catch (Exception e) {
+			pProc.addData(39, "");
+			pProc.addData(40, "");
+		}
+		
+		try {
+			pProc.addData(41, skuUpCells.get(0));
+			pProc.addData(42, upPos++ + "");
+		} catch (Exception e) {
+			pProc.addData(41, "");
+			pProc.addData(42, "");
+		}
+		
+		pProc.addData(46, "88");
+		pProc.addData(47, "");
+		pProc.addData(49, "");
+		pProc.addData(50, "0");
+		pProc.addData(51, "");
+		pProc.addData(52, "");
+		pProc.addData(53, "");
+		pProc.addData(54, "");
+		
+		pProc.processPatterns(data, writter);
+		
+		for(int i = 1; i < 5; i++) {
+			pProc2.addData(i, "");
+		}
+		
+		for(int i = 7; i < 37; i++) {
+			pProc2.addData(i, "");
+		}
+		
+		for(int i = 43; i < 46; i++) {
+			pProc2.addData(i, "");
+		}
+		
+		pProc2.addData(46, "88");
+		
+		for(int i = 43; i < 46; i++) {
+			pProc2.addData(i, "");
+		}
+		
+		pProc2.addData(48, "");
+		pProc2.addData(50, "0");
+		
+		for(int i = 55; i < 63; i++) {
+			pProc2.addData(i, "");
+		}
+		
+		for(int i = 1; i < max; i++) {
+			
+			try{
+				pProc2.addData(5, categoryDataList.get(i));
+				pProc2.addData(6, "Polished Chrome");
+			} catch (Exception e){
+				pProc2.addData(5, "");
+				pProc2.addData(6, "");
+			}
+						
+			try {
+				pProc2.addData(37, skuLinkRelated.get(i));
+				pProc2.addData(38, relPos++ + "");
+			} catch (Exception e) {
+				pProc2.addData(37, "");
+				pProc2.addData(38, "");
+			}
+			
+			try {
+				pProc2.addData(39, skuLinkCrossCell.get(i));
+				pProc2.addData(40, crossPos++ + "");
+			} catch (Exception e) {
+				pProc2.addData(39, "");
+				pProc2.addData(40, "");
+			}
+			
+			try {
+				pProc2.addData(41, skuUpCells.get(i));
+				pProc2.addData(42, upPos++ + "");
+			} catch (Exception e) {
+				pProc2.addData(41, "");
+				pProc2.addData(42, "");
+			}		
+
+			pProc2.addData(47, "");
+			pProc2.addData(49, "");
+			pProc2.addData(51, "");
+			pProc2.addData(52, "");
+			pProc2.addData(53, "");
+			pProc2.addData(54, "");
+			
+			
+			pProc2.processPatterns(data, writter);
+			
+		}
+		
+		if(!urlProcessedSet.contains(url)) {
+			urlProcessedSet.add(url);
+			writerUrlProcessed.writeLine(url);
+		}
+	
+	}
+	
+	private String skloniZarezSaKraja(String niska) {
+		
+		int duzinaNiske = niska.length();
+		
+		int posZarez = niska.lastIndexOf(",");
+		
+		if(duzinaNiske-1 == posZarez) {
+			niska = niska.substring(0, niska.length()-1);
+		}
+		
+		return niska;
+	}
+	
+	private int savePDF(String pdfLink, String fileName, String referer) {
+		try {
+			
+			String host = findInString(pdfLink, hostPattern);
+			
+			//fileName = fileName.replaceAll("\\s{1,}", "-");
+			
+			GetMethod get = new GetMethod(pdfLink);
+			get.setRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:37.0) Gecko/20100101 Firefox/37.0");
+			get.setRequestHeader("Accept-Encoding", "gzip, deflate"); 
+			get.setRequestHeader("Host", host);
+			get.setRequestHeader("Referer", referer);
+				
+			try {
+				httpClient.executeMethod(get);
+			} catch (HttpException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} catch (Exception e) {
+				// TODO Auto-generated catch block
+				return 1;
+			}
+	
+			String html = getData(get, false);
+			if(!findInString(html, pageNotFoundPattern).equals("")) {
+				return 1;
+			}
+			else {
+				if(!findInString(html, pageNotFoundPattern2).equals("")) {
+					return 1;
+				}
+			}
+			
+			get = new GetMethod(pdfLink);
+			get.setRequestHeader("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:37.0) Gecko/20100101 Firefox/37.0");
+			get.setRequestHeader("Accept-Encoding", "gzip, deflate"); 
+			get.setRequestHeader("Host", host);
+			get.setRequestHeader("Referer", referer);
+			
+			httpClient.executeMethod(get);
+						
+			InputStream in = get.getResponseBodyAsStream();	
+	        FileOutputStream out = new FileOutputStream(fileName);
+	        byte[] b = new byte[1024];
+	        int len = 0;
+	        while ((len = in.read(b)) != -1) {
+	        	out.write(b, 0, len);
+	        }
+	        in.close();
+	        out.close();
+	        
+	        get.releaseConnection();
+			
+		} catch (Exception e) {
+			
+			return 1;
+			
+		}
+		
+		return 0;
+		
+	}
+	
+	public static void saveImage(String imageUrl, String destinationFile) throws IOException {
+		URL url = new URL(imageUrl);
+		InputStream is = url.openStream();		
+		OutputStream os = new FileOutputStream(destinationFile);
+
+		byte[] b = new byte[2048];
+		int length;
+
+		while ((length = is.read(b)) != -1) {
+			os.write(b, 0, length);
+		}
+
+		is.close();
+		os.close();
+	}
+	
+	private String getData(HttpMethod post, boolean gZip) {
+		try {
+			BufferedReader in;
+			if (gZip) {
+				in = new BufferedReader(new InputStreamReader(new GZIPInputStream(post.getResponseBodyAsStream()), "utf-8"));
+			} else {
+				in = new BufferedReader(new InputStreamReader(post.getResponseBodyAsStream(), "utf-8"));
+			}
+			
+			
+			String line;
+			StringBuilder sb = new StringBuilder();
+			
+			while ((line = in.readLine()) != null) {
+				sb.append(line);
+			}
+			
+			//System.out.println(sb.toString());
+			return sb.toString();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+		return null;
+	}
+	
+	protected void typeOneProcessing() {
+		paginationURL = null;
+		detailsPageURL = null;
+		String pageHtml = null;
+		String detailsPageHtml = null;
+		String carURLHash = null;
+		long carID;
+		int errorDelay = initialErrorDelay;
+
+		Matcher paginationMatcher;
+		Matcher urlMatcher;
+		HashSet<String> carURLs;
+
+		mainLoop: for (int i = firstPageNumber; i <= lastPageNumber; i += pageIncrement) {
+			paginationURL = incrementPartOneURL + formParam + formValue + pageNumberParam + i + incrementPartTwoURL;
+			pageHtml = getHtml(paginationURL);
+			
+			//System.out.println(pageHtml);
+
+			if (pageHtml != null) {
+				System.out.println("-Pagination page: " + paginationURL);
+				errorCount = 0;
+				errorDelay = initialErrorDelay;
+				urlMatcher = detailsPagePattern.matcher(pageHtml);
+				carURLs = new HashSet<String>();
+				while (urlMatcher.find()) {
+					detailsPageURL = urlMatcher.group(1);
+					if (!detailsPageURL.startsWith("http:")) {
+						detailsPageURL = baseURL + detailsPageURL;
+						//System.out.println(detailsPageURL);
+					}
+
+					detailsPageURL = fixURL(detailsPageURL);
+					System.out.println("\t"+ detailsPageURL);
+					detailsPageURL = detailsPageURL.replaceAll("\\s+", "+");
+					carURLHash = Sha1Hash.SHA1(detailsPageURL);
+					
+					if(!urlSet.contains(detailsPageURL)) {
+						urlSet.add(detailsPageURL);
+						writerUrl.writeLine(detailsPageURL);
+					}
+					
+					if(urlsProcessed.contains(detailsPageURL)) {
+						continue;
+					}
+	
+					if (carURLs.contains(carURLHash)) {
+						continue;
+					} else {
+						carURLs.add(carURLHash);
+					}
+					
+					// test for duplicate url
+//					if (1 == 1 + 0) {
+//					//	DBWorksOnline.updateTime(carID, countryDescription.getCode());
+//						recordCount++;
+//						updatedRecordsCount++;
+//						continue;
+//					}
+
+					charset = "windows-1252";
+					
+					int j = 1;
+					
+					while(j <= 5) {
+						
+						detailsPageHtml = fetchPageContent(detailsPageURL);
+						//detailsPageHtml = fetchPageContent("http://www.efaucets.com/detail.asp?Product_Id=THU9264");	
+						
+						if(detailsPageHtml == null){
+							j++;
+							sleep(1000);
+						}
+						else {
+							String checkHtml = findInString(detailsPageHtml, htmlCheckPattern);
+							if(!checkHtml.equals("")) {
+								write(detailsPageHtml, detailsPageURL, finishId);
+								sleep(1000);
+								break;
+							}
+							else {
+								sleep(1000);
+								break;
+							}
+						}
+					}					
+				}	
+			} else {
+				errorCount++;
+				if (errorCount == 5) {
+					break;
+				}
+				i -= pageIncrement;
+				
+				sleep(errorDelay);
+				errorDelay *= 5;				
+			}
+			if (stopped) {
+				break;
+			}
+		}
+	}
+	
+	public String fetchPageContent(String fromPage) {
+		try {
+			if (httpClient == null) {
+				httpClient = new HttpClient();
+			}
+			
+			httpClient.getHttpConnectionManager().getParams().setConnectionTimeout(60000); 
+			httpClient.getHttpConnectionManager().getParams().setSoTimeout(60000);
+			
+			GetMethod get = new GetMethod(fromPage);
+			
+			get.setRequestHeader("Host", "www.efaucets.com");
+			
+			httpClient.executeMethod(get);
+			
+			//Utils.printHeaders(get.getRequestHeaders());
+			
+			StringBuilder sb = new StringBuilder();
+			String line;
+			BufferedReader in = new BufferedReader(new InputStreamReader(get.getResponseBodyAsStream(), "utf-8"));
+			while ((line = in.readLine()) != null) {
+				sb.append(line).append("\n");
+			}
+			
+			in.close();
+			get.releaseConnection();
+			
+			return sb.toString();			
+		} catch (Exception e) {
+			System.err.println("#### GREŠKA ZA: " + fromPage + " ####");
+			e.printStackTrace();			
+			return null;
+		}
+	}
+	
+	public ArrayList<String> findAllInString(String string, Pattern pattern) {
+		ArrayList<String> list = new ArrayList<String>();
+		
+		Matcher m = pattern.matcher(string);
+		while (m.find()) {
+			//String value = m.group(1).trim();
+			String value = m.group(1).replaceAll("\\s+$","");
+			list.add(value);
+		}
+		
+		return list;		
+	}
+	
+	public String findInString(String string, Pattern pattern) {
+		Matcher m = pattern.matcher(string);
+		while (m.find()) {
+			//String value = m.group(1).trim();
+			String value = m.group(1).replaceAll("\\s+$","");
+		//	System.out.println(value);
+			return value;
+		}
+		return "";
+	}
+	
+	public static void main(String[] args) {
+		
+		new EfaucetsNew2().run();
+
+	}
+
+}

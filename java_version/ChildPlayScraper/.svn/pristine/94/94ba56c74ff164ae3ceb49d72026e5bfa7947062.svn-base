@@ -1,0 +1,221 @@
+package proxy;
+
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.Statement;
+import java.sql.Timestamp;
+import java.util.Date;
+import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.regex.Pattern;
+
+public class ProxyManager extends Thread {
+	
+	private LinkedList<ProxyServer> serverList;
+	private HashSet<String> serversFound;
+	
+	private Connection con;
+	private PreparedStatement insertServer;
+	private PreparedStatement changeStatus;
+
+	public static final Pattern proxyPattern = Pattern.compile("<td class=\"leftborder timestamp\" rel=\"\\d+\">.+?</td>\\s+<td>(.+?</style>)(.+?)</td>.+?<td>\\s+(.+?)</td>", Pattern.DOTALL);
+	public static final Pattern stylesPattern = Pattern.compile("<style>(.+?)</style>", Pattern.DOTALL);
+	public static final Pattern stylePattern = Pattern.compile("\\.(.+?)\\s*\\{display:(.+?)\\}");
+	public static final Pattern addressParts = Pattern.compile("(?:<(?:span|div)\\s+(?:style|class)=\"(.+?)\">([\\.\\d]+)</|((?:\\d+|\\.)))");
+	public static final Pattern addressValidator = Pattern.compile("");
+	
+	public ProxyManager() {
+		serverList = new LinkedList<ProxyServer>();
+		serversFound = new HashSet<String>();
+		loadProxiesFromDB();
+	}
+	
+	private void loadProxiesFromDB() {
+		try {
+			PropertiesLoader.init();
+			Class.forName("com.mysql.jdbc.Driver");
+			con = DriverManager.getConnection("jdbc:mysql://"+ PropertiesLoader.readBaseLocation +"/proxyworks?characterEncoding=UTF-8", 
+					PropertiesLoader.inUsername, PropertiesLoader.inPassword);
+			
+			insertServer = con.prepareStatement("insert into proxy values (null, ?, ?, ?, ?, ?)");
+			changeStatus = con.prepareStatement("update proxy set status = ? where id = ?");
+			
+			Statement st = con.createStatement();
+			ResultSet rs = st.executeQuery("select * from proxy where status like 'working'");
+			while (rs.next()) {
+				String address = rs.getString("address");
+				if (!serversFound.contains(address)) {
+					serversFound.add(address);
+					ProxyServer proxy = new ProxyServer(rs.getInt("id"), address, rs.getInt("port"), rs.getInt("speed"));
+					serverList.add(proxy);
+				}
+			}
+			
+			rs.close();
+			st.close();
+			
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+	}
+
+//	public void run() {
+//		while (true) {
+//			try {
+////				if (serverList.size() > 20) {
+////					Thread.sleep(300000);
+////					continue;
+////				}
+//				HttpClient client = new HttpClient();
+//				GetMethod get = new GetMethod("http://www.hidemyass.com/proxy-list/");
+//				
+//				client.executeMethod(get);
+//				
+//				StringBuilder sb = new StringBuilder();
+//				String line = null;
+//				
+//				BufferedReader in = new BufferedReader(new InputStreamReader(get.getResponseBodyAsStream()));
+//				
+//				while ((line = in.readLine()) != null) {
+//					sb.append(line).append("\n");
+//				}
+//				
+//				in.close();
+//				
+//				Matcher m = proxyPattern.matcher(sb.toString());
+//				int takeMax = 30;
+//				
+//				while (m.find()) {
+//					String styleText = m.group(1);
+//				//	System.out.println(styleText);
+//					HashMap<String, String> stylesMap = new HashMap<String, String>();
+//					
+//					Matcher stylesMatcher = stylesPattern.matcher(styleText);
+//					while (stylesMatcher.find()) {
+//						String styles = stylesMatcher.group(1);
+//						
+//						Matcher styleMatcher = stylePattern.matcher(styles);
+//						while (styleMatcher.find()) {
+//							stylesMap.put(styleMatcher.group(1), styleMatcher.group(2));
+//						}
+//					}
+//					
+//					String address = m.group(2);
+//				//	System.out.println(address);
+//					
+//					Matcher addressPartsMatcher = addressParts.matcher(address);
+//					sb = new StringBuilder();
+//					while (addressPartsMatcher.find()) {
+//						String group3 = addressPartsMatcher.group(3);
+//						if (group3!=null) {
+//							sb.append(group3);
+//							continue;
+//						}
+//						
+//						String style = addressPartsMatcher.group(1).replaceAll("\\s+", "");
+//						String number = addressPartsMatcher.group(2);
+//						
+//						if (stylesMap.containsKey(style)) {
+//							String display = stylesMap.get(style);
+//							if (!display.equals("none")) {
+//								sb.append(number);								
+//							}
+//							continue;
+//						}
+//						
+//						if (!style.equals("display:none")) {
+//							sb.append(number);
+//							continue;
+//						}
+//						
+//						try {
+//							Integer.parseInt(style);
+//							sb.append(number);
+//						} catch (Exception e) {
+//							// TODO: handle exception
+//						}
+//					}
+//				//	sb.deleteCharAt(sb.length()-1);
+//					address = sb.toString();
+//				//	System.out.println(address);
+//				//	System.out.println("-------------------------------------------------------------------------------------------------");
+//					
+//					if (!address.matches("\\d+\\.\\d+\\.\\d+\\.\\d+")) {
+//						continue;
+//					}
+//					
+//					if (serversFound.contains(address)) {
+//						Thread.sleep(120000);
+//						continue;
+//					}
+//					
+//					String port = m.group(3);
+//				//	String anonymity = m.group(3);
+//					
+////					if (!anonymity.equals("High +KA")) {
+////						continue;
+////					}
+//					
+//					ProxyServer ps = new ProxyServer(address, Integer.parseInt(port), 1000);
+//					serverList.add(ps);
+//					serversFound.add(address);
+//					insertServerToDB(ps);
+//					takeMax--;
+//					if (takeMax == 0)
+//						break;
+//				}
+//				
+//				Thread.sleep(120000);
+//			} catch (Exception e) {
+//				e.printStackTrace();
+//			}
+//		}
+//	}
+	
+	private void insertServerToDB(ProxyServer ps) {
+		try {
+			insertServer.setString(1, ps.getAddress());
+			insertServer.setInt(2, ps.getPort());
+			insertServer.setInt(3, 1000);
+			insertServer.setTimestamp(4, new Timestamp(new Date().getTime()));
+			insertServer.setString(5, "working");
+			
+			insertServer.executeUpdate();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+	}
+
+	public synchronized ProxyServer getNextServer() {
+		if (serverList.size() > 0) {
+			return serverList.pollFirst();
+		}
+		
+		return null;
+	}
+	
+	public synchronized void returnServerToList(ProxyServer pServer) {		
+		serverList.addLast(pServer);
+		System.out.println("Proxies in game: " + serverList.size());
+	}
+	
+	public synchronized LinkedList<ProxyServer> getServers() {
+		return serverList;		
+	}
+	
+	public void setProxyStatus(ProxyServer proxy, String status) {
+		try {
+			changeStatus.setString(1, status);
+			changeStatus.setInt(2, proxy.getID());
+			
+			changeStatus.executeUpdate();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+	}
+}
