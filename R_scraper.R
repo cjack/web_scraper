@@ -15,7 +15,7 @@ require(RCurl)
 
 csvname = "sydney_council.csv"
 hostname <- "https://whatson.cityofsydney.nsw.gov.au"
-output_filename = "output.txt"
+output_filename = "output_sydney_council.txt"
 
 ##-----------------------------
 
@@ -64,18 +64,46 @@ pattern_match<- function(url, pattern, pre_sz = 0, suf_sz = 0){
 
 res <- pattern_match(content, pattern, (nchar(pa_prefix) - 8), nchar(pa_sufix))
 
+  remove_comma <- function(str){
+    return(gsub("\"", "'", str))
+  }
+  remove_space <- function(str){
+    while(str != gsub("  ", " ", str)){
+      str <- gsub("  ", " ", str)
+    }
+    return(str)
+  }
+
+
 scraper_webpage <- function(url){
   library(rvest)
   test <- read_html(url)
   
-  ##-----------------------------
-  
   search_result <- function(url, token){
+      
     res <- url %>%
       html_nodes(token) %>%
       html_text()
+    if((length(res) == 0) && (typeof(res) == "character"))
+      res <- ""
+    res <- toString(res)
+    res <- gsub("\r\n", "", res)
+    res <- remove_space(res)
+    #print(res)
     return(res)
   }
+
+  
+  ##-----------------------------
+  
+  ############################################
+  ## search_result <- function(url, token){ ##
+  ##   res <- url %>%                       ##
+  ##     html_nodes(token) %>%              ##
+  ##     html_text()                        ##
+  ##   return(res)                          ##
+  ## }                                      ##
+  ############################################
   
   #-----------      Token Matching    ------------------
   title_token = "title"
@@ -84,7 +112,7 @@ scraper_webpage <- function(url){
   content_token = "section.event-single-description"
   content = search_result(test, content_token)
 
-  time_token = "dd.details-list-definition div"
+  time_token = "div p.date-additional-info"
   time = search_result(test, time_token)[1]
   
   location_token = "dd.details-list-definition a"
@@ -106,12 +134,28 @@ scraper_webpage <- function(url){
   geo <- paste(toString(latitude), toString(longitude), sep = ":")
   #
   
-  res <- c(title, time, location, content, cost, more_info, tag, geo)
-  Table = matrix(res, nrow = 1, ncol = length(res))
-  length(res)
-  Table
-  #colnames(Table) <- c("Title", "Time", "Location", "Content", "Cost", "MoreInfo","Tags")
-  write.table(Table, file = csvname,sep = ",", append = T, row.names = F, col.names = F)
+  res <- c(url, title, time, location, content, cost, more_info, tag, geo)
+
+   #check if exist csv file, if not, add the col names
+  if(!file.exists(csvname)){
+    file.create(csvname)
+    col_name = matrix(res, nrow = 1, ncol = length(res))
+    colnames(col_name) <- c("URL", "Title", "Dates", "Location", "Content", "Cost", "More Info", "Tag", "Geo")
+    write.table(col_name, file = csvname,sep = ",", append = T, row.names = F, col.names = T)
+    print("creating new csv file")
+  }else{
+    Table = matrix(res, nrow = 1, ncol = length(res))
+    if(summary != "" && location != "")
+      write.table(Table, file = csvname,sep = ",", append = T, row.names = F, col.names = F)
+  }
+
+  ##############################################################################################
+  ## Table = matrix(res, nrow = 1, ncol = length(res))                                        ##
+  ## length(res)                                                                              ##
+  ## Table                                                                                    ##
+  ## #colnames(Table) <- c("Title", "Time", "Location", "Content", "Cost", "MoreInfo","Tags") ##
+  ## write.table(Table, file = csvname,sep = ",", append = T, row.names = F, col.names = F)   ##
+  ##############################################################################################
 }
 
 for(i in 1:length(res)){
