@@ -154,14 +154,14 @@ scraper_webpage <- function(url){
   longitude <- attrs[13]
   geo <- paste(toString(latitude), toString(longitude), sep = ":")
   #
-  
-  res <- c(url, title, time, location, content, cost, more_info, tag, geo)
+  empty = ""
+  res <- c(empty, empty, empty, tag, url, title, time, location, content, cost, more_info, geo)
 
    #check if exist csv file, if not, add the col names
   if(!file.exists(csvname)){
     file.create(csvname)
     col_name = matrix(res, nrow = 1, ncol = length(res))
-    colnames(col_name) <- c("URL", "Title", "Dates", "Location", "Content", "Cost", "Phone", "Tag", "Geo")
+    colnames(col_name) <- c("Kids Related", "Comment", "Tags", "Tag in website", "URL", "Title", "Dates", "Location", "Content", "Cost", "Phone", "Geo")
     write.table(col_name, file = csvname,sep = ",", append = T, row.names = F, col.names = T)
     print("creating new csv file")
   }else{
