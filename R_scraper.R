@@ -48,6 +48,13 @@ pa_prefix <- "href=\"/events/"
 pa_sufix <- "\"data-event-type=\'events\'"
 pattern <- paste(pa_prefix, ".*?", pa_sufix, sep = "")
 
+searchXpath <- function(url, token){
+    res <- html_nodes(url, xpath = token) %>%  html_text()
+    if((length(res) == 0) && (typeof(res) == "character"))
+        res <- ""
+    print(res)
+    return(res)
+}
 
 pattern_match<- function(url, pattern, pre_sz = 0, suf_sz = 0){
   content <- toString(url)
@@ -85,14 +92,11 @@ scraper_webpage <- function(url){
       html_nodes(token) %>%
       html_text()
     if((length(res) == 0) && (typeof(res) == "character"))
-      res <- ""
-    res <- toString(res)
-    res <- gsub("\r\n", "", res)
-    res <- remove_space(res)
-    #print(res)
+        res <- ""
+    print(res)
     return(res)
-  }
-
+  }  
+  
   
   ##-----------------------------
   
@@ -111,16 +115,33 @@ scraper_webpage <- function(url){
   title
   content_token = "section.event-single-description"
   content = search_result(test, content_token)
+  
+  time_token = "dd.details-list-definition" 
+  time = search_result(test, time_token)[1] 
+  
+  locationToken <- "//dd[@itemprop='location']"
+  location <- searchXpath(test, locationToken)
 
-  time_token = "div p.date-additional-info"
-  time = search_result(test, time_token)[1]
+  #########################################################
+  ## more_token <- "dd.details-list-definition div span" ##
+  ## more_info <- search_result(test, cost_token)[1]     ##
+  #########################################################
+  cost <- search_result(test, time_token)[3]
+
   
-  location_token = "dd.details-list-definition a"
-  location = search_result(test, location_token)[1]
+  ###########################################################
+  ## cost_token <- "dd.details-list-definition div div" ## ##
+  ## cost <- search_result(test, cost_token)[1]            ##
+  ###########################################################
+  ##
+  more_token = "dd.details-list-definition span a" 
+  more_info = search_result(test, more_token)[2]
+ # more_info <- search_result(test, time_token)[4]     ##
+                                                      ##
+   ## moreToken= "dd.details-list-definition"            ## ##
+   ## more_info = search_result(test, moreToken)            ##
+    ##
   
-  cost_token <- "dd.details-list-definition div span"
-  cost <- search_result(test, cost_token)[1]
-  more_info <- search_result(test, cost_token)[2]
 
   tag_token = "li.tag"
   tag = search_result(test, tag_token)
@@ -140,12 +161,12 @@ scraper_webpage <- function(url){
   if(!file.exists(csvname)){
     file.create(csvname)
     col_name = matrix(res, nrow = 1, ncol = length(res))
-    colnames(col_name) <- c("URL", "Title", "Dates", "Location", "Content", "Cost", "More Info", "Tag", "Geo")
+    colnames(col_name) <- c("URL", "Title", "Dates", "Location", "Content", "Cost", "Phone", "Tag", "Geo")
     write.table(col_name, file = csvname,sep = ",", append = T, row.names = F, col.names = T)
     print("creating new csv file")
   }else{
     Table = matrix(res, nrow = 1, ncol = length(res))
-    if(summary != "" && location != "")
+    #if(summary != "" && location != "")
       write.table(Table, file = csvname,sep = ",", append = T, row.names = F, col.names = F)
   }
 
@@ -173,6 +194,7 @@ for(i in 1:length(res)){
     print(paste("Found new pages", res[[i]]))
     write(res[[i]],file=output_filename,append=TRUE)
     scraper_webpage(res[[i]])
+    #try(scraper_webpage(res[[i]]))
   }
 }
 
