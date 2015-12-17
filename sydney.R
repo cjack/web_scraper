@@ -9,7 +9,7 @@
     
     csvname = "sydney.csv"
     hostname <- "http://www.sydney.com"
-    output_filename = "debug.txt"
+    output_filename = "output_sydney.txt"
     num_of_info_per_page <- 8
     
     ##-----------------------------
