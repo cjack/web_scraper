@@ -123,14 +123,13 @@
       #---------------------------------------------------
       # Add three empty cols for "Kids Related", "Comment", "Tags"
       
-      empty <- ""
-      res <- c(empty, empty, empty, url, title, dates, location, summary, phone)
+      res <- c(url, title, dates, location, summary, phone)
       
       #check if exist csv file, if not, add the col names
       if(!file.exists(csvname)){
           file.create(csvname)
           col_name = matrix(res, nrow = 1, ncol = length(res))
-          colnames(col_name) <- c("Kids Related", "Comment", "Tags", "URL","Title", "Date", "Address", "Content", "Phone")
+          colnames(col_name) <- c("URL","Name", "Date", "Venue address", "Content", "Phone")
           write.table(col_name, file = csvname,sep = ",", append = T, row.names = F, col.names = T)
           print("creating new csv file")
       }else{
