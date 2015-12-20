@@ -12,8 +12,8 @@ modify it and generate anew to part2
 ##  check packages 
 
 
-if(!require("googlesheets")) install.packages("googlesheets")
-if(!require("data.table")) install.packages("data.table")
+if(!require("googlesheets")) install.packages("googlesheets", repos="http://cran.rstudio.com/")
+if(!require("data.table")) install.packages("data.table", repos="http://cran.rstudio.com/")
 ############################################################
 
 library("googlesheets")
