@@ -1,11 +1,6 @@
-"
-This program is to read spreadsheet from part1
-modify it and generate anew to part2
-1. read the spreadsheet from part1
-2. check if there is any column not in the current sheet
-3. if so, add the blank column with that name into the sheet
-4. reset the column order
-5. write to the output file
+"This program is to read spreadsheet from part2
+modify and generate the part3, which is similar with the process
+of immigrating part1 to part2
 "
 ############################################################
 
@@ -24,15 +19,22 @@ today <- Sys.Date()
 today <- format(today, "%Y_%m_%d")
 
 
-input <- "example"
-output <- "Part2"
+input <- "examplePart2"
+output <- "Part3"
 output <- paste(output, "_", today, sep = "")
 
 
-colList <- c("ID","Tags","URL","Title","Date","startDateTime","endDateTime",
-             "Date Time Summary","Venue Name","Address","Price",
-             "Organizer","Contact Summary","Contact Name","Phone","Email",
-             "Web","Booking","Details","Images","Comment")
+##################################################################################
+## colList <- c("ID","Tags","URL","Title","Date","startDateTime","endDateTime", ##
+##              "Date Time Summary","Venue Name","Address","Price",             ##
+##              "Organizer","Contact Summary","Contact Name","Phone","Email",   ##
+##              "Web","Booking","Details","Images","Comment")                   ##
+##################################################################################
+
+## required column names list
+
+colList <- c("Added Date", "Scrapped Date", "ID", "URL", "Tags", "Name", "Date", "startDateTime", "endDateTime", "Date Time.Summary", "Venue name", "Venue address", "Modified Venue.Address", "lat", "lon", "Price", "Organizer", "Contact Summary", "Contact name", "Phone", "Email", "Web", "Booking", "Details", "Images", "Comments", "Source", "Editor Rating", "Editor Title", "SuburbCountryOnly")
+
 
 
 ############################################################
@@ -85,15 +87,6 @@ removeUnnecessaryCol <- function(input, output){
 }
 
 
-## Generate the ID by the name of worksheet and the date
-idFormat <- function(ws, wsName, today){
-     for(i in 1:nrow(ws)){
-        id <- paste(wsName, "_", today, "_", toString(i), sep = "")
-        ws[i, "ID"] <- id
-    }
-    return(ws)
-}
-
 checkColExistence <- function(ID, worksheet){
     if(ID %in% colnames(worksheet)){
         return(TRUE)
@@ -123,17 +116,10 @@ processOneWorkSheet <- function(wsName, sheetName, otherSheet, colList){
     sheet <- gs_title(sheetName)
     message(paste("Processing the worksheet: ", wsName))
     ws <- sheet %>% gs_read(ws = wsName)
+   
     
-    ws = subset(ws, Kids.Related == "y")
-    
-        #################################################################################
-        ## colList <- c("ID","Tags","URL","Name","Date","startDateTime","endDateTime", ##
-        ##          "Date Time Summary","Venue Name","Venue Address","Price",          ##
-        ##          "Organizer","Contact Summary","Contact Name","Phone","Email",      ##
-        ##          "Web","Booking","Details","Images","Comment")                      ##
-        #################################################################################
 
-
+    ## check and add the miss column
     for(i in 1:length(colList)){
         cl <- colList[i]
         ##print(cl)
@@ -145,9 +131,6 @@ processOneWorkSheet <- function(wsName, sheetName, otherSheet, colList){
 
     ws <- checkInList(ws, colList)
 
-    ## add ID column automatically
-    ws <- idFormat(ws, wsName,today)
-    
     ## remove the NA 
     ws[is.na(ws)] <- ""
     require(data.table)
@@ -179,15 +162,13 @@ main <- function(input, output, colList){
 main(input, output, colList)
 
 
-
-
-
-
-
-
-
-
-
+##################################################
+##   gap <- gs_title("example")                 ##
+##   ws <- gap %>% gs_read(ws = "new")          ##
+##                                              ##
+## ws                                           ##
+## gap <- gap %>% gs_edit_cells(ws = "new", ws) ##
+##################################################
 
 
 
