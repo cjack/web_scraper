@@ -19,8 +19,9 @@ today <- Sys.Date()
 today <- format(today, "%Y_%m_%d")
 
 
-input <- "examplePart2"
+input <- "Part2"
 output <- "Part3"
+input <- paste(input, "_", today, sep = "")
 output <- paste(output, "_", today, sep = "")
 
 
@@ -33,7 +34,8 @@ output <- paste(output, "_", today, sep = "")
 
 ## required column names list
 
-colList <- c("Added Date", "Scrapped Date", "ID", "URL", "Tags", "Name", "Date", "startDateTime", "endDateTime", "Date Time.Summary", "Venue name", "Venue address", "Modified Venue.Address", "lat", "lon", "Price", "Organizer", "Contact Summary", "Contact name", "Phone", "Email", "Web", "Booking", "Details", "Images", "Comments", "Source", "Editor Rating", "Editor Title", "SuburbCountryOnly")
+
+colList <- c("Added Date", "Scrapped Date", "ID", "URL", "Tags", "Name", "Date", "startDateTime", "endDateTime", "Date Time.Summary", "Venue name", "Address", "Modified Venue.Address", "lat", "lon", "Price", "Organizer", "Contact Summary", "Contact name", "Phone", "Email", "Web", "Booking", "Details", "Images", "Comments", "Source", "Editor Rating", "Editor Title", "SuburbCountryOnly")
 
 
 
@@ -59,6 +61,29 @@ tryCatch(
     message(paste("Checking completed: ", output))
 }
 )
+
+## check if the worksheet is existed or not
+## if not then create it
+
+checkWorksheet <- function(wsName, sheetName){
+    message("Checking Worksheet")
+    sheet <- gs_title(sheetName)
+    tryCatch(
+        {
+            sheet %>% gs_read(ws = wsName)
+        }, error = function(cond){
+            message(paste("Worksheet:", wsName, "has not found"))
+            message("Creating a new worksheet")
+            sheet %>% gs_ws_new(wsName)
+            message("Done")
+        }, warning = function(cond){
+            message("There's a warning")
+            message(cond)
+        }, finally = {
+            message(paste("Checking completed:", wsName))
+        }
+    )
+}
 ############################################################
 
 ## This function is to remove the unnecessary column in output
@@ -111,7 +136,6 @@ checkInList <- function(ws, colList){
 
 
 
-
 processOneWorkSheet <- function(wsName, sheetName, otherSheet, colList){
     sheet <- gs_title(sheetName)
     message(paste("Processing the worksheet: ", wsName))
@@ -128,24 +152,41 @@ processOneWorkSheet <- function(wsName, sheetName, otherSheet, colList){
             ws[,cl] <- ""
         }
     }
+    ## remove the invaild row
+    ws <- subset(ws, Name != "")
 
     ws <- checkInList(ws, colList)
-
+    
     ## remove the NA 
     ws[is.na(ws)] <- ""
+
+    print(colnames(ws))
+    
     require(data.table)
     x <- data.table(ws)
     setcolorder(x, colList)
 
-    ##create another tab in other file
+    colNames <- colnames(x)
+
+    ## change the colname from Address to Venue address
+    if("Address" %in% colNames){
+        index <- which(colnames(x) %in% "Address")
+        ##index <- getColnameIndex(a, "Title")
+        colnames(x)[index] <- "Venue address"
+    }
+  
+
+    checkWorksheet(wsName, otherSheet)
     other <- gs_title(otherSheet)
-    other <- other %>% gs_ws_new(wsName)
+
+    ##create another tab in other file
+    ##other <- other %>% gs_ws_new(wsName)
     
     #other <- gs_title(otherSheet)
     other %>% gs_edit_cells(ws=wsName, input=x)
 }
 
-#processOneWorkSheet("new", "example", output, colList)
+##processOneWorkSheet("Cardinia", input, output, colList)
 
 main <- function(input, output, colList){
     sheet <- gs_title(input) #get the sheet
