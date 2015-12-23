@@ -30,7 +30,7 @@ output <- paste(output, "_", today, sep = "")
 
 
 colList <- c("ID","Tags","URL","Name","Date","startDateTime","endDateTime",
-             "Date Time Summary","Venue name","Venue address","Price",
+             "Date Time Summary","Venue name","Address","Price",
              "Organizer","Contact Summary","Contact name","Phone","Email",
              "Web","Booking","Details","Images","Comments")
 
@@ -181,11 +181,18 @@ processOneWorkSheet <- function(wsName, sheetName, otherSheet, colList){
         colnames(ws)[index] <- "Date"
     }
 
-    if("Address" %in% colNames){
-        index <- which(colnames(ws) %in% "Address")
+    if("URLs" %in% colNames){
+        index <- which(colnames(ws) %in% "URLs")
         ##index <- getColnameIndex(a, "Title")
-        colnames(ws)[index] <- "Venue address"
+        colnames(ws)[index] <- "URL"
     }
+    #####################################################
+    ## if("Address" %in% colNames){                    ##
+    ##     index <- which(colnames(ws) %in% "Address") ##
+    ##     ##index <- getColnameIndex(a, "Title")      ##
+    ##     colnames(ws)[index] <- "Venue address"      ##
+    ## }                                               ##
+    #####################################################
 
     
 ##    print(colnames(ws))
