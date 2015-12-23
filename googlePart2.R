@@ -24,15 +24,15 @@ today <- Sys.Date()
 today <- format(today, "%Y_%m_%d")
 
 
-input <- "example"
+input <- "Part1"
 output <- "Part2"
 output <- paste(output, "_", today, sep = "")
 
 
-colList <- c("ID","Tags","URL","Title","Date","startDateTime","endDateTime",
-             "Date Time Summary","Venue Name","Address","Price",
-             "Organizer","Contact Summary","Contact Name","Phone","Email",
-             "Web","Booking","Details","Images","Comment")
+colList <- c("ID","Tags","URL","Name","Date","startDateTime","endDateTime",
+             "Date Time Summary","Venue name","Venue address","Price",
+             "Organizer","Contact Summary","Contact name","Phone","Email",
+             "Web","Booking","Details","Images","Comments")
 
 
 ############################################################
@@ -57,6 +57,28 @@ tryCatch(
     message(paste("Checking completed: ", output))
 }
 )
+
+
+
+checkWorksheet <- function(wsName, sheetName){
+    message("Checking Worksheet")
+    sheet <- gs_title(sheetName)
+    tryCatch(
+        {
+            sheet %>% gs_read(ws = wsName)
+        }, error = function(cond){
+            message(paste("Worksheet:", wsName, "has not found"))
+            message("Creating a new worksheet")
+            sheet %>% gs_ws_new(wsName)
+            message("Done")
+        }, warning = function(cond){
+            message("There's a warning")
+            message(cond)
+        }, finally = {
+            message(paste("Checking completed:", wsName))
+        }
+    )
+}
 ############################################################
 
 ## This function is to remove the unnecessary column in output
@@ -83,6 +105,7 @@ removeUnnecessaryCol <- function(input, output){
     }
 
 }
+
 
 
 ## Generate the ID by the name of worksheet and the date
@@ -134,6 +157,39 @@ processOneWorkSheet <- function(wsName, sheetName, otherSheet, colList){
         #################################################################################
 
 
+
+    ## add ID column automatically
+    ws <- idFormat(ws, wsName,today)
+    colNames <- colnames(ws)
+    ## check and change the col name
+    if("Title" %in% colNames){
+        index <- which(colnames(ws) %in% "Title")
+        ##index <- getColnameIndex(a, "Title")
+        colnames(ws)[index] <- "Name"
+    }
+
+    if("Comment" %in% colNames){
+        index <- which(colnames(ws) %in% "Comment")
+        ##index <- getColnameIndex(a, "Title")
+        colnames(ws)[index] <- "Comments"
+    }
+
+
+    if("Dates" %in% colNames){
+        index <- which(colnames(ws) %in% "Dates")
+        ##index <- getColnameIndex(a, "Title")
+        colnames(ws)[index] <- "Date"
+    }
+
+    if("Address" %in% colNames){
+        index <- which(colnames(ws) %in% "Address")
+        ##index <- getColnameIndex(a, "Title")
+        colnames(ws)[index] <- "Venue address"
+    }
+
+    
+##    print(colnames(ws))
+    ##check if the colname not exist then create 
     for(i in 1:length(colList)){
         cl <- colList[i]
         ##print(cl)
@@ -143,10 +199,11 @@ processOneWorkSheet <- function(wsName, sheetName, otherSheet, colList){
         }
     }
 
+    
+     ## check whether the current column is in the
+    ## required list, if not, just remove it.
     ws <- checkInList(ws, colList)
 
-    ## add ID column automatically
-    ws <- idFormat(ws, wsName,today)
     
     ## remove the NA 
     ws[is.na(ws)] <- ""
@@ -155,14 +212,17 @@ processOneWorkSheet <- function(wsName, sheetName, otherSheet, colList){
     setcolorder(x, colList)
 
     ##create another tab in other file
+
+    checkWorksheet(wsName, otherSheet)
     other <- gs_title(otherSheet)
-    other <- other %>% gs_ws_new(wsName)
+    
+    ##other <- other %>% gs_ws_new(wsName)
     
     #other <- gs_title(otherSheet)
     other %>% gs_edit_cells(ws=wsName, input=x)
 }
 
-#processOneWorkSheet("new", "example", output, colList)
+##processOneWorkSheet("new", "example", output, colList)
 
 main <- function(input, output, colList){
     sheet <- gs_title(input) #get the sheet
@@ -174,13 +234,25 @@ main <- function(input, output, colList){
     removeUnnecessaryCol(input, output)
 }
 
+
 ############################################################
 
 main(input, output, colList)
 
 
-
-
+##########################################################
+## gap <- gs_title("example")                           ##
+##                                                      ##
+## ws <- gap %>% gs_read("new")                         ##
+##                                                      ##
+## a <- colnames(ws)                                    ##
+##                                                      ##
+##                                                      ##
+##                                                      ##
+##                                                      ##
+## colnames(ws)                                         ##
+## gap <- gap %>% gs_edit_cells(ws = "new", input = ws) ##
+##########################################################
 
 
 
