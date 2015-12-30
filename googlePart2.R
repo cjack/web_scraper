@@ -28,11 +28,13 @@ input <- "Part1"
 output <- "Part2"
 output <- paste(output, "_", today, sep = "")
 
-
-colList <- c("ID","Tags","URL","Name","Date","startDateTime","endDateTime",
-             "Date Time Summary","Venue name","Address","Price",
-             "Organizer","Contact Summary","Contact name","Phone","Email",
-             "Web","Booking","Details","Images","Comments")
+colList <- c("Added Date", "Scrapped Date", "ID", "URL", "Tags", "Name", "Date", "startDateTime", "endDateTime", "Date Time Summary", "Venue name", "Venue address", "Modified Venue Address", "lat", "lon", "Price", "Organizer", "Contact Summary", "Contact name", "Phone", "Email", "Web", "Booking", "Details", "Images", "Comments", "Source", "Editor Rating", "Editor Title", "SuburbCountryOnly")
+#################################################################################
+## colList <- c("ID","Tags","URL","Name","Date","startDateTime","endDateTime", ##
+##              "Date Time Summary","Venue name","Address","Price",            ##
+##              "Organizer","Contact Summary","Contact name","Phone","Email",  ##
+##              "Web","Booking","Details","Images","Comments")                 ##
+#################################################################################
 
 
 ############################################################
@@ -186,6 +188,14 @@ processOneWorkSheet <- function(wsName, sheetName, otherSheet, colList){
         ##index <- getColnameIndex(a, "Title")
         colnames(ws)[index] <- "URL"
     }
+
+    
+    if("Address" %in% colNames){
+        index <- which(colnames(ws) %in% "Address")
+        ##index <- getColnameIndex(a, "Title")
+        colnames(ws)[index] <- "Venue address"
+    }
+
     #####################################################
     ## if("Address" %in% colNames){                    ##
     ##     index <- which(colnames(ws) %in% "Address") ##
@@ -229,7 +239,7 @@ processOneWorkSheet <- function(wsName, sheetName, otherSheet, colList){
     other %>% gs_edit_cells(ws=wsName, input=x)
 }
 
-##processOneWorkSheet("new", "example", output, colList)
+##processOneWorkSheet("new", input, output, colList)
 
 main <- function(input, output, colList){
     sheet <- gs_title(input) #get the sheet
@@ -247,19 +257,30 @@ main <- function(input, output, colList){
 main(input, output, colList)
 
 
-##########################################################
-## gap <- gs_title("example")                           ##
-##                                                      ##
-## ws <- gap %>% gs_read("new")                         ##
-##                                                      ##
-## a <- colnames(ws)                                    ##
-##                                                      ##
-##                                                      ##
-##                                                      ##
-##                                                      ##
-## colnames(ws)                                         ##
-## gap <- gap %>% gs_edit_cells(ws = "new", input = ws) ##
-##########################################################
+
+##############################################################
+## gap <- gs_title("Part1")                           ##    ##
+##                                                      ##  ##
+## wsNames <- gap %>% gs_ws_ls()                            ##
+## res = ""                                                 ##
+##                                                          ##
+##                                                          ##
+## lapply(wsNames, function(x) res = paste(res, x))         ##
+## print(res)##                                             ##
+## aaa <- colnames(ws)                                      ##
+##                                                          ##
+## gap <- gs_title("ex2")                           ##      ##
+##                                                      ##  ##
+## ws <- gap %>% gs_read("Knox")                         ## ##
+##                                                      ##  ##
+## bbb <- colnames(ws)                                      ##
+##                                                      ##  ##
+##                                                      ##  ##
+##                                                      ##  ##
+## colnames(ws)                                         ##  ##
+## gap <- gap %>% gs_edit_cells(ws = "new", input = ws) ##  ##
+##############################################################
+
 
 
 
