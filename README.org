@@ -1,9 +1,9 @@
 * Overview
 This is a trial version of web scraper, with limited functions. Feel free to change the pattern by using regular expressions to match 
-other webpages.
+your webpages.
 * Checklist
 - R version 3.2.1 (2015-06-18) -- "World-Famous Astronaut"
-- Tested in OS X Yosemite
+- Tested in OS X Yosemite, Windows 7, Ubuntu 14.04
 * Instructions
 Bascially, run the command,
 #+BEGIN_SRC sh
@@ -13,7 +13,6 @@ Or run
 #+BEGIN_SRC sh
 make
 #+END_SRC
-* Packages
-- Require "rvest", please run command by "install.package("rvest")"
-- Require "RCurl", please use similar command as above.
+
+
 
