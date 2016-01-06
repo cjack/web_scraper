@@ -161,7 +161,7 @@ scraper_webpage <- function(url){
   if(!file.exists(csvname)){
     file.create(csvname)
     col_name = matrix(res, nrow = 1, ncol = length(res))
-    colnames(col_name) <- c("Tag in website", "URL", "Name", "Date", "Venue address", "Content", "Cost", "Phone", "Geo")
+    colnames(col_name) <- c("Tag in website", "URL", "Name", "Date", "Address", "Content", "Cost", "Phone", "Geo")
     write.table(col_name, file = csvname,sep = ",", append = T, row.names = F, col.names = T)
     print("creating new csv file")
   }else{

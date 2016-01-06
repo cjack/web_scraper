@@ -129,7 +129,7 @@
       if(!file.exists(csvname)){
           file.create(csvname)
           col_name = matrix(res, nrow = 1, ncol = length(res))
-          colnames(col_name) <- c("URL","Name", "Date", "Venue address", "Content", "Phone")
+          colnames(col_name) <- c("URL","Name", "Date", "Address", "Content", "Phone")
           write.table(col_name, file = csvname,sep = ",", append = T, row.names = F, col.names = T)
           print("creating new csv file")
       }else{
