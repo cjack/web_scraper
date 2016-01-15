@@ -110,14 +110,19 @@ scraper_webpage <- function(url){
   ############################################
   
   #-----------      Token Matching    ------------------
-  title_token = "title"
+  title_token = "div.event-title-wrapper-inner h1"
   title = search_result(test, title_token)
+
   title
   content_token = "section.event-single-description"
   content = search_result(test, content_token)
+
+
   
-  time_token = "dd.details-list-definition" 
-  time = search_result(test, time_token)[1] 
+  ####################################################
+  ## time_token = "dd.details-list-definition div"  ##
+  ## time = search_result(test, time_token)[1]      ##
+  ####################################################
   
   locationToken <- "//dd[@itemprop='location']"
   location <- searchXpath(test, locationToken)
@@ -125,14 +130,34 @@ scraper_webpage <- function(url){
   #########################################################
   ## more_token <- "dd.details-list-definition div span" ##
   ## more_info <- search_result(test, cost_token)[1]     ##
-  #########################################################
-  cost <- search_result(test, time_token)[3]
-
+#########################################################
   
-  ###########################################################
-  ## cost_token <- "dd.details-list-definition div div" ## ##
-  ## cost <- search_result(test, cost_token)[1]            ##
-  ###########################################################
+  ppf <- "Cost</dt><dd class=\"details-list-definition\"><div><div>"     ##
+  psf <- "</div>"                                                        ##
+  costPattern <- paste(ppf, ".*?", psf, sep = "")                        ##
+  costContent <- readLines(url)                                           ##
+  costRes <- pattern_match(costContent, costPattern, nchar(ppf), nchar(psf)) ##
+  costRes <- gsub("<br/>", "\n", costRes)                                           ##
+  cost <- costRes                                                        ##
+  
+  ppf <- "When</dt><dd class=\"details-list-definition\"><div>"
+  psf <- "</div>"
+  timepattern <- paste(ppf, ".*?", psf, sep = "")
+
+  res <- pattern_match(costContent, timepattern, nchar(ppf), nchar(psf))
+  res <- gsub("<br/>", "\n", res)
+  res <- gsub("</p>", "\n", res)
+  fill <- "<p class=\"date-additional-info\">"
+  fill2 <- "<p>"
+  res <- gsub(fill, "", res)
+  res <- gsub(fill2, "", res)
+  time <- res
+  
+  
+  ## cost_token <- "dd.details-list-definition div div" ## ## ##
+  ## cost <- search_result(test, cost_token)[1]               ##
+    ##
+  
   ##
   more_token = "dd.details-list-definition span a" 
   more_info = search_result(test, more_token)[2]
@@ -155,13 +180,13 @@ scraper_webpage <- function(url){
   geo <- paste(toString(latitude), toString(longitude), sep = ":")
   #
 
-  res <- c(tag, url, title, time, location, content, cost, more_info, geo)
+  res <- c(tag, url, title, time, content, cost, geo)
 
    #check if exist csv file, if not, add the col names
   if(!file.exists(csvname)){
     file.create(csvname)
     col_name = matrix(res, nrow = 1, ncol = length(res))
-    colnames(col_name) <- c("Tag in website", "URL", "Name", "Date", "Address", "Content", "Cost", "Phone", "Geo")
+    colnames(col_name) <- c("Tag in website", "URL", "Name", "Date", "Details", "Cost", "Geo")
     write.table(col_name, file = csvname,sep = ",", append = T, row.names = F, col.names = T)
     print("creating new csv file")
   }else{

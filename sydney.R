@@ -87,18 +87,20 @@
       
       
       #-----------      Token Matching    ------------------
-      title_token = "title "
+      title_token = "h1.main-heading"
       title = search_result(test, title_token)
       
       location_token = "div.adr"
       location = search_result(test, location_token)
       location = gsub('\n', "", location)
       location = gsub("                ", " ", location)
-      location = gsub("Address:", "", location)
+      location = gsub(" Address:  ", "", location)
       
-      
+      phonef_token = "span.tel span"
+      phonef <- search_result(test, phonef_token)
       phone_token = "span.tel"
       phone <- search_result(test, phone_token)
+      phone <- gsub(phonef, "", phone)
       
       dates_token = "h2.event-date-details"
       dates <- search_result(test, dates_token)
@@ -110,8 +112,19 @@
       
       #search_attr(test, "meta.description", content)
       summary <- about[length(about)]
+
+      email_token = "a.ga_URL_lead_email"
+      email = search_result(test, email_token)
+      email <- gsub("Send Email, Email: ", "", email)
       
-      
+      ppf <- "Website: </strong>"  ##
+      psf <- "</a>"                                                ##
+      pattern <- paste(ppf, ".*?", psf, sep = "")                    ##
+      rawData <- readLines(url)                                      ##
+      res <- pattern_match(rawData, pattern, nchar(ppf), nchar(psf)) ##
+      res <- gsub("<br/>", "\n", res)                                ##
+      res <- gsub("</p>", "\n", res) 
+      website <- res
       
       cast <- "div.side-box a"
       link <- search_attr(test, cast, "title")
@@ -123,13 +136,13 @@
       #---------------------------------------------------
       # Add three empty cols for "Kids Related", "Comment", "Tags"
       
-      res <- c(url, title, dates, location, summary, phone)
+      res <- c(url, title, dates, location, summary, phone, email, website)
       
       #check if exist csv file, if not, add the col names
       if(!file.exists(csvname)){
           file.create(csvname)
           col_name = matrix(res, nrow = 1, ncol = length(res))
-          colnames(col_name) <- c("URL","Name", "Date", "Address", "Content", "Phone")
+          colnames(col_name) <- c("URL","Name", "Date", "Address", "Details", "Phone", "Email", "Website")
           write.table(col_name, file = csvname,sep = ",", append = T, row.names = F, col.names = T)
           print("creating new csv file")
       }else{
